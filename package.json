@@ -1,0 +1,15 @@
+{
+  "name": "resonance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal music knowledge system. Database is source of truth; AI is an interpretation layer.",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "db:generate": "pnpm --filter @resonance/db generate",
+    "db:migrate": "pnpm --filter @resonance/db migrate",
+    "db:seed": "pnpm --filter @resonance/db seed",
+    "db:studio": "pnpm --filter @resonance/db studio",
+    "api:dev": "pnpm --filter @resonance/api dev",
+    "docker:db": "docker compose up -d db"
+  }
+}

@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-resonance}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resonance}
+      POSTGRES_DB: ${POSTGRES_DB:-resonance}
+    ports:
+      - "5432:5432"
+    volumes:
+      - resonance_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resonance}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Phase 0: run the API locally with `pnpm api:dev`. This service is here for
+  # later use; it builds the whole monorepo (context = repo root).
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      RESONANCE_API_TOKEN: ${RESONANCE_API_TOKEN}
+      PORT: 8000
+    ports:
+      - "8000:8000"
+
+volumes:
+  resonance_db:
