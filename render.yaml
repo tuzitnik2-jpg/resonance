@@ -59,13 +59,12 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      # The browser only ever talks to the web app's own origin; Next proxies /api/v1/* to the
-      # API server-side (see apps/web/next.config.js), which keeps the session cookie same-site.
+      # The browser only ever talks to the web app's own origin; app/api/v1/[...path]/route.ts
+      # proxies /api/v1/* to the API server-side, which keeps the session cookie same-site.
       #
-      # Set this manually in the resonance-web dashboard AFTER the first deploy, to the API's
-      # public URL — e.g. https://resonance-api-xxxx.onrender.com (find it on the resonance-api
-      # service page). sync:false means the blueprint will NOT overwrite your value on later
-      # deploys. (Render's `fromService` host wiring proved unreliable for a public web->web
-      # proxy, injecting an unusable value — hence an explicit URL here.)
+      # This must be the API's PUBLIC url (…​.onrender.com). Render's `fromService` host wiring
+      # injects the API's *internal* name (e.g. resonance-api-l7wu, no domain), which doesn't
+      # resolve — so it's set explicitly here. If you fork/redeploy under a different API URL,
+      # change this value (find it on the resonance-api service page).
       - key: API_INTERNAL_URL
-        sync: false
+        value: https://resonance-api-l7wu.onrender.com
