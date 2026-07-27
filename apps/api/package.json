@@ -1,0 +1,45 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test --ext .ts",
+    "test": "jest --config jest.config.js",
+    "test:e2e": "jest --config jest-e2e.config.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.6",
+    "@nestjs/config": "^3.3.0",
+    "@nestjs/core": "^10.4.6",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/platform-express": "^10.4.6",
+    "@prisma/client": "^5.22.0",
+    "@resonance/ai": "workspace:*",
+    "@resonance/db": "workspace:*",
+    "@resonance/domain": "workspace:*",
+    "@resonance/shared": "workspace:*",
+    "argon2": "^0.41.1",
+    "cookie-parser": "^1.4.7",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.5",
+    "@nestjs/testing": "^10.4.6",
+    "@types/cookie-parser": "^1.4.7",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.9.0",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.6.3"
+  }
+}

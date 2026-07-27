@@ -1,0 +1,482 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto]
+}
+
+// ---------- Enums ----------
+
+enum ActorType {
+  USER
+  AI
+  IMPORT
+  SYSTEM
+}
+
+enum TagCategory {
+  GENRE
+  THEME
+  MOOD
+  DANCE
+  USAGE
+  LANGUAGE
+}
+
+enum TagSource {
+  USER
+  AI
+  IMPORT
+  PROVIDER
+}
+
+enum SongStatus {
+  ACTIVE
+  ARCHIVED
+  WANT_TO_LISTEN
+}
+
+enum ImportStatus {
+  PENDING
+  ANALYZED
+  COMMITTING
+  COMMITTED
+  FAILED
+}
+
+enum ReleaseType {
+  SINGLE
+  EP
+  ALBUM
+  COMPILATION
+}
+
+enum ReleasePrecision {
+  YEAR
+  MONTH
+  DAY
+}
+
+enum MemoryVisibility {
+  PRIVATE
+  SHARED
+}
+
+enum AnalysisType {
+  MEANING
+  STYLE
+  MOOD_ENERGY
+  DANCE
+  REELS
+  FESTIVAL
+  COLLECTION
+}
+
+enum AnalysisStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+enum ConversationChannel {
+  CHATGPT
+  WEB
+}
+
+enum ConversationRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+// ---------- Core entities ----------
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique
+  displayName  String   @map("display_name")
+  passwordHash String   @map("password_hash")
+  locale       String   @default("cs")
+  timezone     String   @default("Europe/Prague")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  songUserData  SongUserData[]
+  auditEvents   AuditEvent[]
+  importJobs    ImportJob[]
+  memories      Memory[]
+  playlists     Playlist[]
+  conversations Conversation[]
+
+  @@map("users")
+}
+
+model Artist {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonicalName  String    @map("canonical_name")
+  normalizedName String    @map("normalized_name")
+  countryCode    String?   @map("country_code") @db.Char(2)
+  description    String?
+  musicbrainzId  String?   @map("musicbrainz_id")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+
+  albums               Album[]
+  primarySongs         Song[]                @relation("PrimaryArtist")
+  songArtistLinks      SongArtist[]
+  festivalPerformances FestivalPerformance[]
+
+  @@index([normalizedName])
+  @@map("artists")
+}
+
+model Album {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  artistId         String            @map("artist_id") @db.Uuid
+  title            String
+  normalizedTitle  String            @map("normalized_title")
+  releaseType      ReleaseType?      @map("release_type")
+  releaseYear      Int?              @map("release_year")
+  releaseMonth     Int?              @map("release_month")
+  releaseDay       Int?              @map("release_day")
+  releasePrecision ReleasePrecision? @map("release_precision")
+  coverUrl         String?           @map("cover_url")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz
+
+  artist Artist @relation(fields: [artistId], references: [id])
+  songs  Song[]
+
+  @@index([artistId])
+  @@index([normalizedTitle])
+  @@map("albums")
+}
+
+model Song {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  primaryArtistId  String            @map("primary_artist_id") @db.Uuid
+  albumId          String?           @map("album_id") @db.Uuid
+  title            String
+  normalizedTitle  String            @map("normalized_title")
+  releaseYear      Int?              @map("release_year")
+  releaseMonth     Int?              @map("release_month")
+  releaseDay       Int?              @map("release_day")
+  releasePrecision ReleasePrecision? @map("release_precision")
+  durationMs       Int?              @map("duration_ms")
+  languageCode     String?           @map("language_code")
+  isrc             String?
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz
+
+  primaryArtist Artist         @relation("PrimaryArtist", fields: [primaryArtistId], references: [id])
+  album         Album?         @relation(fields: [albumId], references: [id])
+  songArtists   SongArtist[]
+  songTags      SongTag[]
+  userData      SongUserData[]
+  playlistItems PlaylistItem[]
+  analyses      SongAnalysis[]
+
+  @@index([primaryArtistId])
+  @@index([albumId])
+  @@index([normalizedTitle])
+  @@map("songs")
+}
+
+/// Additional artists on a song beyond the primary one (featured, producer, remixer, ...)
+model SongArtist {
+  songId   String @map("song_id") @db.Uuid
+  artistId String @map("artist_id") @db.Uuid
+  role     String @default("featured")
+
+  song   Song   @relation(fields: [songId], references: [id])
+  artist Artist @relation(fields: [artistId], references: [id])
+
+  @@id([songId, artistId, role])
+  @@index([artistId])
+  @@map("song_artists")
+}
+
+/// Per-user personal data on a song: rating, favorite, note, discovery, energy.
+/// "energy" is modeled as a numeric column here (not a Tag row) because the
+/// source spec explicitly calls it out as a numeric value rather than a text tag.
+model SongUserData {
+  userId          String     @map("user_id") @db.Uuid
+  songId          String     @map("song_id") @db.Uuid
+  rating          Int?
+  energyLevel     Int?       @map("energy_level")
+  favorite        Boolean    @default(false)
+  status          SongStatus @default(ACTIVE)
+  userNote        String?    @map("user_note")
+  discoveredAt    DateTime?  @map("discovered_at") @db.Timestamptz
+  discoverySource String?    @map("discovery_source")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+  song Song @relation(fields: [songId], references: [id])
+
+  @@id([userId, songId])
+  @@index([songId])
+  @@map("song_user_data")
+}
+
+model Tag {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  normalizedName String      @map("normalized_name")
+  category       TagCategory
+  description    String?
+  systemManaged  Boolean     @default(false) @map("system_managed")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz
+
+  songTags SongTag[]
+
+  @@unique([normalizedName, category])
+  @@index([normalizedName])
+  @@map("tags")
+}
+
+model SongTag {
+  songId     String    @map("song_id") @db.Uuid
+  tagId      String    @map("tag_id") @db.Uuid
+  source     TagSource @default(USER)
+  confidence Float?
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz
+  createdBy  String?   @map("created_by") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  song Song @relation(fields: [songId], references: [id])
+  tag  Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([songId, tagId])
+  @@index([tagId])
+  @@map("song_tags")
+}
+
+/// Append-only audit trail. Application code must only ever call .create() on
+/// this model; a migration additionally REVOKEs UPDATE/DELETE at the DB level.
+model AuditEvent {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  actorType  ActorType @map("actor_type")
+  actorId    String?   @map("actor_id") @db.Uuid
+  action     String
+  entityType String    @map("entity_type")
+  /// Usually a single UUID, but composite-key entities (e.g. song_tags, playlist_items)
+  /// record a "id1:id2" compound key here, so this is plain text rather than @db.Uuid.
+  entityId   String    @map("entity_id")
+  beforeJson Json?     @map("before_json")
+  afterJson  Json?     @map("after_json")
+  requestId  String?   @map("request_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_events")
+}
+
+model ImportJob {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  sourceType  String       @map("source_type")
+  filename    String
+  status      ImportStatus @default(PENDING)
+  summaryJson Json?        @map("summary_json")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  committedAt DateTime?    @map("committed_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("import_jobs")
+}
+
+// ---------- Phase 2: personal music context ----------
+
+/// A standalone memory attached to any entity (song, artist, festival, ...).
+/// entityType/entityId form a loose polymorphic reference; there is no FK
+/// constraint since the referenced table varies.
+model Memory {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  entityType String           @map("entity_type")
+  entityId   String           @map("entity_id") @db.Uuid
+  title      String
+  body       String?
+  occurredOn DateTime?        @map("occurred_on") @db.Date
+  location   String?
+  visibility MemoryVisibility @default(PRIVATE)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt  DateTime?        @map("deleted_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("memories")
+}
+
+model Festival {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  city        String?
+  countryCode String?   @map("country_code") @db.Char(2)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  websiteUrl  String?   @map("website_url")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  performances FestivalPerformance[]
+
+  @@map("festivals")
+}
+
+model FestivalPerformance {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  festivalId String    @map("festival_id") @db.Uuid
+  artistId   String    @map("artist_id") @db.Uuid
+  stage      String?
+  startsAt   DateTime? @map("starts_at") @db.Timestamptz
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz
+  priority   Int?
+  attended   Boolean   @default(false)
+  rating     Int?
+  note       String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  festival Festival @relation(fields: [festivalId], references: [id])
+  artist   Artist   @relation(fields: [artistId], references: [id])
+
+  @@unique([festivalId, artistId, stage])
+  @@index([artistId])
+  @@map("festival_performances")
+}
+
+model Playlist {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  name        String
+  type        String    @default("collection")
+  description String?
+  externalUrl String?   @map("external_url")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  user  User           @relation(fields: [userId], references: [id])
+  items PlaylistItem[]
+
+  @@index([userId])
+  @@map("playlists")
+}
+
+model PlaylistItem {
+  playlistId String   @map("playlist_id") @db.Uuid
+  songId     String   @map("song_id") @db.Uuid
+  position   Int
+  reason     String?
+  addedAt    DateTime @default(now()) @map("added_at") @db.Timestamptz
+
+  playlist Playlist @relation(fields: [playlistId], references: [id])
+  song     Song     @relation(fields: [songId], references: [id])
+
+  @@id([playlistId, songId])
+  @@index([songId])
+  @@map("playlist_items")
+}
+
+/// Polymorphic external link (Spotify, YouTube, Bandcamp, SoundCloud, MusicBrainz, ...).
+model ExternalLink {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entityType String    @map("entity_type")
+  entityId   String    @map("entity_id") @db.Uuid
+  provider   String
+  url        String
+  providerId String?   @map("provider_id")
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([entityType, entityId])
+  @@map("external_links")
+}
+
+// ---------- Phase 3: AI analysis ----------
+
+/// Versioned AI or manual analysis of a song's meaning/style/mood/etc.
+/// Never updated in place — a new row + status transition replaces it (ADR-0004 style rule 6.3).
+model SongAnalysis {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  songId        String         @map("song_id") @db.Uuid
+  analysisType  AnalysisType   @map("analysis_type")
+  contentJson   Json           @map("content_json")
+  summary       String?
+  source        TagSource      @default(AI)
+  model         String?
+  promptVersion String?        @map("prompt_version")
+  status        AnalysisStatus @default(DRAFT)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  song Song @relation(fields: [songId], references: [id])
+
+  @@index([songId])
+  @@index([status])
+  @@map("song_analyses")
+}
+
+model PromptVersion {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  version      Int
+  instructions String
+  schemaJson   Json?    @map("schema_json")
+  active       Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([name, version])
+  @@index([name, active])
+  @@map("prompt_versions")
+}
+
+model Conversation {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                  String              @map("user_id") @db.Uuid
+  title                   String?
+  channel                 ConversationChannel @default(WEB)
+  externalConversationRef String?             @map("external_conversation_ref")
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  user     User                  @relation(fields: [userId], references: [id])
+  messages ConversationMessage[]
+
+  @@index([userId])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String           @map("conversation_id") @db.Uuid
+  role           ConversationRole
+  content        String
+  toolCallsJson  Json?            @map("tool_calls_json")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@map("conversation_messages")
+}
