@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { logout } from "@/lib/api-client";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 const primary = [
   { href: "/home", label: "Home", icon: "⌂" },
@@ -27,11 +30,10 @@ function isActive(pathname: string | null, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Nav() {
-  const pathname = usePathname();
-
+/** The nav link groups, shared by the desktop sidebar and the mobile drawer. */
+function NavLinks({ pathname }: { pathname: string | null }) {
   return (
-    <aside className="sidebar">
+    <>
       <div className="sidebar-block sidebar-block--nav">
         <Link href="/home" className="sidebar-brand">
           <span className="sidebar-brand-mark">R</span>
@@ -76,6 +78,68 @@ export function Nav() {
           ))}
         </nav>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function Nav() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { me } = useCurrentUser();
+  const [open, setOpen] = useState(false);
+
+  async function handleLogout() {
+    await logout().catch(() => undefined);
+    router.replace("/login");
+  }
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="sidebar">
+        <NavLinks pathname={pathname} />
+      </aside>
+
+      {/* Mobile top bar */}
+      <header className="mobile-bar">
+        <button
+          className="mobile-bar-btn"
+          aria-label="Open menu"
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
+        >
+          ☰
+        </button>
+        <Link href="/home" className="mobile-bar-brand">
+          <span className="sidebar-brand-mark">R</span>
+          Resonance
+        </Link>
+        <Link href="/songs/new" className="mobile-bar-btn" aria-label="Add a song">
+          +
+        </Link>
+      </header>
+
+      {/* Mobile slide-in drawer */}
+      <div
+        className={`nav-drawer-backdrop${open ? " is-open" : ""}`}
+        onClick={() => setOpen(false)}
+        aria-hidden
+      />
+      <aside
+        className={`nav-drawer${open ? " is-open" : ""}`}
+        onClick={(e) => {
+          // Close after tapping any link inside the drawer.
+          if ((e.target as HTMLElement).closest("a")) setOpen(false);
+        }}
+      >
+        <NavLinks pathname={pathname} />
+        <div className="sidebar-block sidebar-footer">
+          {me && <div className="sidebar-user">{me.email}</div>}
+          <button onClick={handleLogout} className="btn btn-secondary btn-sm btn-block">
+            Log out
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
