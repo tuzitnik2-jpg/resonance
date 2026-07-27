@@ -565,6 +565,71 @@ ul {
   box-shadow: var(--shadow-md);
 }
 
+/* ---- star rating ---- */
+.star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.star {
+  position: relative;
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  font-size: 1.5rem;
+  line-height: 1.5em;
+  text-align: center;
+}
+.star-rating--sm .star {
+  width: 1em;
+  height: 1em;
+  font-size: 1rem;
+  line-height: 1em;
+}
+.star-bg {
+  color: var(--color-border-strong);
+}
+.star-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+.star-hit {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 50%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.star-hit-left {
+  left: 0;
+}
+.star-hit-right {
+  right: 0;
+}
+.star-value {
+  margin-left: 0.6rem;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+.star-clear {
+  margin-left: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.star-clear:hover {
+  color: var(--color-danger);
+}
+
 /* ---- filter chips (list filtering) ---- */
 .filter-bar {
   display: flex;

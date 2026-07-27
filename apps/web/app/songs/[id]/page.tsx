@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { Alert, AppShell, Badge, Button, Card, EmptyState, Hero } from "@/components/ui";
 import { ImageUploader } from "@/components/image-uploader";
+import { StarRating } from "@/components/star-rating";
 import {
   ApiError,
   attachTag,
@@ -239,14 +240,10 @@ export default function SongDetailPage() {
           <form onSubmit={handleSaveRelationship}>
             <div className="form-row">
               <label className="field">
-                <span className="field-label">Rating (1-10)</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={rating}
-                  onChange={(e) => setRating(e.target.value)}
-                  className="input"
+                <span className="field-label">Rating</span>
+                <StarRating
+                  value={rating ? Number(rating) : 0}
+                  onChange={(v) => setRating(v ? String(v) : "")}
                 />
               </label>
               <label className="field">
