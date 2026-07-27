@@ -1,10 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { ApiError, createFestival, listFestivals, type Festival } from "@/lib/api-client";
-import { Alert, AppShell, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import {
+  Alert,
+  AppShell,
+  Button,
+  Card,
+  EmptyState,
+  MediaCard,
+  MediaGrid,
+  PageHeader,
+} from "@/components/ui";
 
 export default function FestivalsPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -42,49 +50,51 @@ export default function FestivalsPage() {
   if (authLoading || !me) return null;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <PageHeader title="Festivals" subtitle={`${festivals.length} total`} />
 
-      <div className="section-stack">
-        <Card title="Add festival">
-          <form onSubmit={handleCreate} className="form-row">
-            <input
-              required
-              placeholder="Festival name…"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input"
-            />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="input"
-            />
-            <Button type="submit" variant="primary">
-              Add
-            </Button>
-          </form>
-          {error && <Alert>{error}</Alert>}
-        </Card>
+      <Card title="Add festival">
+        <form onSubmit={handleCreate} className="form-row">
+          <input
+            required
+            placeholder="Festival name…"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input"
+          />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="input"
+          />
+          <Button type="submit" variant="primary">
+            Add
+          </Button>
+        </form>
+        {error && <Alert>{error}</Alert>}
+      </Card>
 
-        <Card title="Your festivals">
-          {festivals.length === 0 && <EmptyState>No festivals yet.</EmptyState>}
-          <ul className="list">
-            {festivals.map((festival) => (
-              <Link key={festival.id} href={`/festivals/${festival.id}`} className="list-row">
-                <div className="list-row-main">
-                  <div className="list-row-title">{festival.name}</div>
-                  {festival.startDate && (
-                    <div className="list-row-meta">
-                      {new Date(festival.startDate).toLocaleDateString()}
-                    </div>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </ul>
-        </Card>
+      <div style={{ marginTop: "1.5rem" }}>
+        {festivals.length === 0 && <EmptyState>No festivals yet.</EmptyState>}
+        <MediaGrid>
+          {festivals.map((festival) => {
+            const location = [festival.city, festival.countryCode].filter(Boolean).join(", ");
+            const dates = festival.startDate
+              ? new Date(festival.startDate).toLocaleDateString()
+              : undefined;
+            return (
+              <MediaCard
+                key={festival.id}
+                href={`/festivals/${festival.id}`}
+                title={festival.name}
+                subtitle={location || dates}
+                icon="✺"
+                tone="gold"
+              />
+            );
+          })}
+        </MediaGrid>
       </div>
     </AppShell>
   );

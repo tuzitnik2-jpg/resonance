@@ -18,7 +18,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(email, password);
-      router.replace("/songs");
+      router.replace("/home");
     } catch (err) {
       setError(err instanceof ApiError ? (err.problem.detail ?? err.message) : "Login failed.");
     } finally {
@@ -29,7 +29,9 @@ export default function LoginPage() {
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", marginBottom: "0.35rem" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "0.7rem", marginBottom: "0.35rem" }}
+        >
           <span className="sidebar-brand-mark" style={{ width: 36, height: 36, fontSize: "1rem" }}>
             R
           </span>
@@ -59,7 +61,13 @@ export default function LoginPage() {
             />
           </Field>
           {error && <Alert>{error}</Alert>}
-          <Button type="submit" variant="primary" size="md" disabled={submitting} className="btn-block">
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            disabled={submitting}
+            className="btn-block"
+          >
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
         </form>

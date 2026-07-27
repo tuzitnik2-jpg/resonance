@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { Nav } from "./nav";
+import { TopBar } from "./top-bar";
+import { NowSpinning } from "./now-spinning";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -9,6 +11,15 @@ const variantClass: Record<Variant, string> = {
   secondary: "btn btn-secondary",
   ghost: "btn btn-ghost",
   danger: "btn btn-danger",
+};
+
+export type Tone = "green" | "gold" | "red" | "mixed";
+
+const toneTile: Record<Tone, string> = {
+  green: "tile-green",
+  gold: "tile-gold",
+  red: "tile-red",
+  mixed: "tile-mixed",
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -88,7 +99,13 @@ export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="empty-state">{children}</p>;
 }
 
-export function Alert({ children, tone = "danger" }: { children: ReactNode; tone?: "danger" | "success" }) {
+export function Alert({
+  children,
+  tone = "danger",
+}: {
+  children: ReactNode;
+  tone?: "danger" | "success" | "warning";
+}) {
   return <p className={`alert alert-${tone}`}>{children}</p>;
 }
 
@@ -103,13 +120,7 @@ export function Badge({
   return <span className={cls}>{children}</span>;
 }
 
-export function Field({
-  label,
-  children,
-}: {
-  label: ReactNode;
-  children: ReactNode;
-}) {
+export function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <label className="field">
       <span className="field-label">{label}</span>
@@ -122,6 +133,105 @@ export function Loading() {
   return <p className="skeleton-text">Loading…</p>;
 }
 
+/* ---------------- Spotify content primitives ---------------- */
+
+/** A Spotify-style content tile: gradient art + title + subtitle, with a hover play button. */
+export function MediaCard({
+  href,
+  title,
+  subtitle,
+  icon,
+  tone = "green",
+  round = false,
+}: {
+  href: string;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  icon: ReactNode;
+  tone?: Tone;
+  round?: boolean;
+}) {
+  return (
+    <Link href={href} className="media-card">
+      <div className={`media-art ${toneTile[tone]}${round ? " media-art--round" : ""}`}>{icon}</div>
+      <div className="media-title">{title}</div>
+      {subtitle !== undefined && <div className="media-sub">{subtitle}</div>}
+      <span className="play-fab" aria-hidden>
+        ▸
+      </span>
+    </Link>
+  );
+}
+
+export function MediaGrid({ children }: { children: ReactNode }) {
+  return <div className="media-grid">{children}</div>;
+}
+
+/** A titled row of content, with an optional "show all" link. */
+export function Shelf({
+  title,
+  moreHref,
+  moreLabel = "Show all",
+  children,
+}: {
+  title: ReactNode;
+  moreHref?: string;
+  moreLabel?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="shelf">
+      <div className="shelf-head">
+        <h2 className="shelf-title">{title}</h2>
+        {moreHref && (
+          <Link href={moreHref} className="shelf-more">
+            {moreLabel}
+          </Link>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** A gradient hero header for detail pages. */
+export function Hero({
+  tone = "green",
+  icon,
+  eyebrow,
+  title,
+  meta,
+  round = false,
+  actions,
+}: {
+  tone?: "green" | "gold" | "red";
+  icon: ReactNode;
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  meta?: ReactNode;
+  round?: boolean;
+  actions?: ReactNode;
+}) {
+  return (
+    <>
+      <div className={`hero hero--${tone}`}>
+        <div className={`hero-art ${toneTile[tone]}${round ? " hero-art--round" : ""}`}>{icon}</div>
+        <div className="hero-body">
+          {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+          <h1 className="hero-title">{title}</h1>
+          {meta && <div className="hero-meta">{meta}</div>}
+        </div>
+      </div>
+      {actions && (
+        <div className="page-actions" style={{ marginBottom: "1.5rem" }}>
+          {actions}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** The three-region Spotify shell: sidebar · (top bar + scroll) · now-spinning bar. */
 export function AppShell({
   children,
   width = "default",
@@ -138,9 +248,11 @@ export function AppShell({
   return (
     <div className="app-shell">
       <Nav />
-      <main className="app-main">
+      <main className="main-view">
+        <TopBar />
         <div className={containerClass}>{children}</div>
       </main>
+      <NowSpinning />
     </div>
   );
 }

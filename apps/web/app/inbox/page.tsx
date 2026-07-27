@@ -9,7 +9,7 @@ import {
   rejectAnalysis,
   type SongAnalysis,
 } from "@/lib/api-client";
-import { Alert, AppShell, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, AppShell, Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
 
 export default function InboxPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -50,13 +50,33 @@ export default function InboxPage() {
       <div className="section-stack">
         {items.map((item) => (
           <Card key={item.id}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "0.75rem",
+              }}
+            >
               <strong>{item.analysisType}</strong>
-              {item.song && (
-                <Link href={`/songs/${item.songId}`}>
-                  {item.song.title} — {item.song.primaryArtist?.canonicalName}
-                </Link>
-              )}
+              <span className="list-row-side">
+                {item.song && (
+                  <Link href={`/songs/${item.songId}`}>
+                    {item.song.title} — {item.song.primaryArtist?.canonicalName}
+                  </Link>
+                )}
+                <Badge
+                  tone={
+                    item.status === "APPROVED"
+                      ? "success"
+                      : item.status === "REJECTED"
+                        ? "danger"
+                        : "neutral"
+                  }
+                >
+                  {item.status}
+                </Badge>
+              </span>
             </div>
             {item.summary && <p>{item.summary}</p>}
             <pre

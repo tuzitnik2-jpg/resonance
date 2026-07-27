@@ -1,10 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { ApiError, createPlaylist, listPlaylists, type Playlist } from "@/lib/api-client";
-import { Alert, AppShell, Button, EmptyState, PageHeader } from "@/components/ui";
+import {
+  Alert,
+  AppShell,
+  Button,
+  EmptyState,
+  MediaCard,
+  MediaGrid,
+  PageHeader,
+} from "@/components/ui";
 
 export default function PlaylistsPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -42,33 +49,38 @@ export default function PlaylistsPage() {
   if (authLoading || !me) return null;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <PageHeader title="Playlists" subtitle={`${playlists.length} collections`} />
 
-      <form onSubmit={handleCreate} className="form-row" style={{ marginBottom: "1.25rem" }}>
-        <input
-          required
-          placeholder="New collection name…"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="input"
-        />
-        <Button type="submit" variant="primary">
-          Create
-        </Button>
-      </form>
+      <div className="card" style={{ marginBottom: "1.5rem" }}>
+        <form onSubmit={handleCreate} className="form-row">
+          <input
+            required
+            placeholder="New collection name…"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input"
+          />
+          <Button type="submit" variant="primary">
+            Create
+          </Button>
+        </form>
+      </div>
 
       {error && <Alert>{error}</Alert>}
       {playlists.length === 0 && <EmptyState>No playlists yet.</EmptyState>}
-      <ul className="list">
+      <MediaGrid>
         {playlists.map((playlist) => (
-          <Link key={playlist.id} href={`/playlists/${playlist.id}`} className="list-row">
-            <div className="list-row-main">
-              <div className="list-row-title">{playlist.name}</div>
-            </div>
-          </Link>
+          <MediaCard
+            key={playlist.id}
+            href={`/playlists/${playlist.id}`}
+            title={playlist.name}
+            subtitle={playlist.description ?? `${playlist.items?.length ?? 0} tracks`}
+            icon="☰"
+            tone="mixed"
+          />
         ))}
-      </ul>
+      </MediaGrid>
     </AppShell>
   );
 }

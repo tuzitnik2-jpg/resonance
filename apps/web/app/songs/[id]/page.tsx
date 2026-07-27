@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
-import { Alert, AppShell, Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, AppShell, Badge, Button, Card, EmptyState, Hero } from "@/components/ui";
 import {
   ApiError,
   attachTag,
@@ -189,11 +189,16 @@ export default function SongDetailPage() {
   const attachedTagIds = new Set((song.songTags ?? []).map((st) => st.tagId));
   const availableTags = allTags.filter((t) => !attachedTagIds.has(t.id));
 
+  const userData = song.userData?.[0];
+
   return (
     <AppShell>
-      <PageHeader
+      <Hero
+        tone={userData?.favorite ? "red" : "green"}
+        icon="♪"
+        eyebrow="Song"
         title={song.title}
-        subtitle={
+        meta={
           <>
             {song.primaryArtist && (
               <Link href={`/artists/${song.primaryArtist.id}`}>
@@ -201,12 +206,13 @@ export default function SongDetailPage() {
               </Link>
             )}
             {song.album && (
-              <>
-                {" — "}
+              <span className="hero-dot">
                 <Link href={`/albums/${song.album.id}`}>{song.album.title}</Link>
-              </>
+              </span>
             )}
-            {song.releaseYear ? ` (${song.releaseYear})` : ""}
+            {song.releaseYear ? <span className="hero-dot">{song.releaseYear}</span> : null}
+            {userData?.favorite ? <Badge tone="danger">♥ favorite</Badge> : null}
+            {userData?.rating ? <Badge>{userData.rating}/10</Badge> : null}
           </>
         }
         actions={
@@ -399,7 +405,9 @@ export default function SongDetailPage() {
                   padding: "0.7rem 0.85rem",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                >
                   <strong>{analysis.analysisType}</strong>
                   <Badge
                     tone={

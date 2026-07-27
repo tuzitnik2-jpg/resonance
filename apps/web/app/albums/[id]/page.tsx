@@ -13,7 +13,7 @@ import {
   type Album,
   type Song,
 } from "@/lib/api-client";
-import { Alert, AppShell, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui";
 
 export default function AlbumDetailPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -63,14 +63,18 @@ export default function AlbumDetailPage() {
 
   return (
     <AppShell>
-      <PageHeader
+      <Hero
+        tone="red"
+        icon="◍"
+        eyebrow="Album"
         title={album.title}
-        subtitle={
-          album.artist && (
-            <>
-              by <Link href={`/artists/${album.artist.id}`}>{album.artist.canonicalName}</Link>
-            </>
-          )
+        meta={
+          <>
+            {album.artist && (
+              <Link href={`/artists/${album.artist.id}`}>{album.artist.canonicalName}</Link>
+            )}
+            {album.releaseYear ? <span className="hero-dot">{album.releaseYear}</span> : null}
+          </>
         }
         actions={
           <Button variant="danger" onClick={handleDelete}>

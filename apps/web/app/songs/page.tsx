@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { listSongs, type Song } from "@/lib/api-client";
-import { Alert, AppShell, Badge, EmptyState, Loading, PageHeader } from "@/components/ui";
+import {
+  Alert,
+  AppShell,
+  EmptyState,
+  Loading,
+  MediaCard,
+  MediaGrid,
+  PageHeader,
+} from "@/components/ui";
 
 export default function SongsPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -24,7 +32,7 @@ export default function SongsPage() {
   if (authLoading || !me) return null;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <PageHeader
         title="Songs"
         subtitle={`${songs.length} in your library`}
@@ -40,28 +48,32 @@ export default function SongsPage() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="input"
-        style={{ marginBottom: "1.25rem" }}
+        style={{ marginBottom: "1.5rem", maxWidth: 420 }}
       />
       {error && <Alert>{error}</Alert>}
       {loading && <Loading />}
       {!loading && songs.length === 0 && <EmptyState>No songs yet.</EmptyState>}
-      <ul className="list">
+      <MediaGrid>
         {songs.map((song) => {
           const userData = song.userData?.[0];
           return (
-            <Link key={song.id} href={`/songs/${song.id}`} className="list-row">
-              <div className="list-row-main">
-                <div className="list-row-title">{song.title}</div>
-                <div className="list-row-meta">{song.primaryArtist?.canonicalName}</div>
-              </div>
-              <span className="list-row-side">
-                {userData?.favorite && <Badge tone="danger">♥ favorite</Badge>}
-                {userData?.rating ? <Badge>{userData.rating}/10</Badge> : null}
-              </span>
-            </Link>
+            <MediaCard
+              key={song.id}
+              href={`/songs/${song.id}`}
+              title={song.title}
+              subtitle={
+                <>
+                  {song.primaryArtist?.canonicalName}
+                  {userData?.favorite ? " · ♥" : ""}
+                  {userData?.rating ? ` · ${userData.rating}/10` : ""}
+                </>
+              }
+              icon="♪"
+              tone={userData?.favorite ? "red" : "green"}
+            />
           );
         })}
-      </ul>
+      </MediaGrid>
     </AppShell>
   );
 }

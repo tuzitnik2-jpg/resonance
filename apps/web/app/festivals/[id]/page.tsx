@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
-import { Alert, AppShell, Badge, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, AppShell, Badge, Button, Card, EmptyState, Hero } from "@/components/ui";
 import {
   ApiError,
   addFestivalPerformance,
@@ -78,10 +78,24 @@ export default function FestivalDetailPage() {
 
   return (
     <AppShell>
-      <PageHeader
+      <Hero
+        tone="gold"
+        icon="✺"
+        eyebrow="Festival"
         title={festival.name}
-        subtitle={
-          festival.startDate ? new Date(festival.startDate).toLocaleDateString() : undefined
+        meta={
+          <>
+            {festival.city && <span>{festival.city}</span>}
+            {festival.countryCode && (
+              <span className={festival.city ? "hero-dot" : undefined}>{festival.countryCode}</span>
+            )}
+            {festival.startDate && (
+              <span className={festival.city || festival.countryCode ? "hero-dot" : undefined}>
+                {new Date(festival.startDate).toLocaleDateString()}
+                {festival.endDate ? ` – ${new Date(festival.endDate).toLocaleDateString()}` : ""}
+              </span>
+            )}
+          </>
         }
         actions={
           <Button variant="danger" onClick={handleDelete}>
@@ -118,7 +132,11 @@ export default function FestivalDetailPage() {
           </ul>
 
           <form onSubmit={handleAddPerformance} className="form-row" style={{ marginTop: "1rem" }}>
-            <select value={artistId} onChange={(e) => setArtistId(e.target.value)} className="select">
+            <select
+              value={artistId}
+              onChange={(e) => setArtistId(e.target.value)}
+              className="select"
+            >
               {artists.map((artist) => (
                 <option key={artist.id} value={artist.id}>
                   {artist.canonicalName}

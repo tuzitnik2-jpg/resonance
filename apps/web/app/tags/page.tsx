@@ -66,7 +66,7 @@ export default function TagsPage() {
   const grouped = CATEGORIES.map((cat) => ({ cat, items: tags.filter((t) => t.category === cat) }));
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <PageHeader title="Tags" subtitle={`${tags.length} total`} />
 
       <Card title="Add tag">

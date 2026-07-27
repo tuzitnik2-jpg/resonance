@@ -9,14 +9,16 @@ export default function HomePage() {
 
   useEffect(() => {
     getMe()
-      .then(() => router.replace("/songs"))
+      .then(() => router.replace("/home"))
       .catch(() => router.replace("/login"));
   }, [router]);
 
   return (
     <div className="auth-shell">
       <div className="auth-card">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", marginBottom: "0.35rem" }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: "0.7rem", marginBottom: "0.35rem" }}
+        >
           <span className="sidebar-brand-mark" style={{ width: 36, height: 36, fontSize: "1rem" }}>
             R
           </span>

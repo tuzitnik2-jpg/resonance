@@ -14,7 +14,7 @@ import {
   type Playlist,
   type Song,
 } from "@/lib/api-client";
-import { Alert, AppShell, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui";
 
 export default function PlaylistDetailPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -73,9 +73,21 @@ export default function PlaylistDetailPage() {
 
   return (
     <AppShell>
-      <PageHeader
+      <Hero
+        tone="green"
+        icon="☰"
+        eyebrow="Playlist"
         title={playlist.name}
-        subtitle={playlist.description}
+        meta={
+          <>
+            {playlist.description ? <span>{playlist.description}</span> : null}
+            {playlist.description ? (
+              <span className="hero-dot">{playlist.items?.length ?? 0} tracks</span>
+            ) : (
+              <span>{playlist.items?.length ?? 0} tracks</span>
+            )}
+          </>
+        }
         actions={
           <Button variant="danger" onClick={handleDelete}>
             Delete playlist

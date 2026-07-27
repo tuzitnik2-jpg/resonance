@@ -83,7 +83,9 @@ export default function ImportPage() {
           )}
           <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "0.5rem" }}>
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-border-strong)" }}>
+              <tr
+                style={{ textAlign: "left", borderBottom: "1px solid var(--color-border-strong)" }}
+              >
                 <th>Track</th>
                 <th>Artist</th>
                 <th>Album</th>

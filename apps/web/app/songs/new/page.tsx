@@ -65,14 +65,7 @@ export default function NewSongPage() {
               className="input"
             />
           </Field>
-          {warning && (
-            <p
-              className="alert"
-              style={{ background: "var(--color-warning-soft)", color: "var(--color-warning)" }}
-            >
-              {warning}
-            </p>
-          )}
+          {warning && <Alert tone="warning">{warning}</Alert>}
           {error && <Alert>{error}</Alert>}
           <Button type="submit" variant="primary" disabled={submitting}>
             {submitting ? "Saving…" : "Add song"}

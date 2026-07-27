@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
-import { Alert, AppShell, Button, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui";
 import {
   ApiError,
   deleteArtist,
@@ -90,8 +90,28 @@ export default function ArtistDetailPage() {
 
   return (
     <AppShell>
-      <PageHeader
+      <Hero
+        tone="gold"
+        icon="◈"
+        eyebrow="Artist"
         title={artist.canonicalName}
+        round
+        meta={
+          <>
+            {artist.countryCode ? <span>{artist.countryCode}</span> : null}
+            {artist.musicbrainzId ? (
+              <span className="hero-dot">
+                <a
+                  href={`https://musicbrainz.org/artist/${artist.musicbrainzId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  MusicBrainz
+                </a>
+              </span>
+            ) : null}
+          </>
+        }
         actions={
           <Button variant="danger" onClick={handleDelete}>
             Delete artist

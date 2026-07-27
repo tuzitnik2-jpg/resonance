@@ -1,10 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { ApiError, createArtist, listArtists, type Artist } from "@/lib/api-client";
-import { Alert, AppShell, Button, EmptyState, Loading, PageHeader } from "@/components/ui";
+import {
+  Alert,
+  AppShell,
+  Button,
+  EmptyState,
+  Loading,
+  MediaCard,
+  MediaGrid,
+  PageHeader,
+} from "@/components/ui";
 
 export default function ArtistsPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -44,7 +52,7 @@ export default function ArtistsPage() {
   if (authLoading || !me) return null;
 
   return (
-    <AppShell>
+    <AppShell width="wide">
       <PageHeader title="Artists" subtitle={`${artists.length} in your library`} />
       <form onSubmit={handleCreate} className="form-row" style={{ marginBottom: "1rem" }}>
         <input
@@ -62,21 +70,24 @@ export default function ArtistsPage() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="input"
-        style={{ marginBottom: "1.25rem" }}
+        style={{ marginBottom: "1.5rem", maxWidth: 420 }}
       />
       {error && <Alert>{error}</Alert>}
       {loading && <Loading />}
       {!loading && artists.length === 0 && <EmptyState>No artists yet.</EmptyState>}
-      <ul className="list">
+      <MediaGrid>
         {artists.map((artist) => (
-          <Link key={artist.id} href={`/artists/${artist.id}`} className="list-row">
-            <div className="list-row-main">
-              <div className="list-row-title">{artist.canonicalName}</div>
-              {artist.countryCode && <div className="list-row-meta">{artist.countryCode}</div>}
-            </div>
-          </Link>
+          <MediaCard
+            key={artist.id}
+            href={`/artists/${artist.id}`}
+            title={artist.canonicalName}
+            subtitle={artist.countryCode || "Artist"}
+            icon="◈"
+            tone="gold"
+            round
+          />
         ))}
-      </ul>
+      </MediaGrid>
     </AppShell>
   );
 }
