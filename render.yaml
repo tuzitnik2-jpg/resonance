@@ -1,0 +1,69 @@
+# Render Blueprint for Resonance — provisions Postgres + API + Web from code.
+# Apply via Render Dashboard → New → Blueprint, pointed at this repo.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This exists because Render's auto-detection guessed "Python" for the repo root.
+# The blueprint tells Render explicitly that these are Node services and how to
+# build/start each one. The MCP server (apps/mcp) is intentionally omitted here —
+# it's only needed for the ChatGPT connector; add it later as a fourth service if
+# you want it (same shape as resonance-api, start `pnpm --filter mcp start`, with
+# RESONANCE_API_URL wired to the API like resonance-web's API_INTERNAL_URL below).
+
+databases:
+  - name: resonance-db
+    databaseName: resonance
+    user: resonance
+    plan: free
+    region: frankfurt
+
+services:
+  # ---- API (NestJS) ------------------------------------------------------
+  - type: web
+    name: resonance-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    # Build the api and its workspace deps (Prisma generate runs as part of @resonance/db#build).
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=api
+    # Apply migrations and (idempotently) seed the admin user + default prompt, then start.
+    startCommand: pnpm --filter @resonance/db migrate:deploy && pnpm --filter @resonance/db seed && pnpm --filter api start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: resonance-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      # Your admin login — Render will prompt you to set these when applying the blueprint.
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      # Optional: set to enable AI-generated analyses. Leave blank and they return 503.
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # ---- Web (Next.js) -----------------------------------------------------
+  - type: web
+    name: resonance-web
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=web
+    startCommand: pnpm --filter web start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # The browser only ever talks to the web app's own origin; Next proxies /api/v1/* to the
+      # API server-side (see apps/web/next.config.js), which keeps the session cookie same-site.
+      # fromService injects the API's host (no scheme); next.config.js prepends https://.
+      - key: API_INTERNAL_URL
+        fromService:
+          type: web
+          name: resonance-api
+          property: host

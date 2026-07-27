@@ -37,7 +37,8 @@ app.post("/mcp", async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 });
 
-const port = process.env.MCP_PORT ? Number(process.env.MCP_PORT) : 3002;
-app.listen(port, () => {
+// Render (and most PaaS) inject the port to bind on via $PORT; fall back to MCP_PORT for local.
+const port = Number(process.env.PORT ?? process.env.MCP_PORT ?? 3002);
+app.listen(port, "0.0.0.0", () => {
   console.log(`Resonance MCP server listening on port ${port}`);
 });
