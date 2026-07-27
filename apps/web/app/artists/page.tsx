@@ -21,12 +21,29 @@ export default function ArtistsPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
 
   function refresh() {
     listArtists({ query: query || undefined })
-      .then((page) => setArtists(page.items))
+      .then((page) => {
+        setArtists(page.items);
+        setCursor(page.nextCursor);
+      })
       .catch(() => setError("Failed to load artists."))
       .finally(() => setLoading(false));
+  }
+
+  function loadMore() {
+    if (!cursor) return;
+    setLoadingMore(true);
+    listArtists({ query: query || undefined, cursor })
+      .then((page) => {
+        setArtists((prev) => [...prev, ...page.items]);
+        setCursor(page.nextCursor);
+      })
+      .catch(() => setError("Failed to load artists."))
+      .finally(() => setLoadingMore(false));
   }
 
   useEffect(() => {
@@ -89,6 +106,14 @@ export default function ArtistsPage() {
           />
         ))}
       </MediaGrid>
+
+      {cursor && (
+        <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
+          <button className="btn btn-secondary" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      )}
     </AppShell>
   );
 }

@@ -29,15 +29,32 @@ function SongsInner() {
   const [sort, setSort] = useState<Sort>("title");
   const [tagName, setTagName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!me) return;
     listSongs({ query: query || undefined, tagId })
-      .then((page) => setSongs(page.items))
+      .then((page) => {
+        setSongs(page.items);
+        setCursor(page.nextCursor);
+      })
       .catch(() => setError("Failed to load songs."))
       .finally(() => setLoading(false));
   }, [me, query, tagId]);
+
+  function loadMore() {
+    if (!cursor) return;
+    setLoadingMore(true);
+    listSongs({ query: query || undefined, tagId, cursor })
+      .then((page) => {
+        setSongs((prev) => [...prev, ...page.items]);
+        setCursor(page.nextCursor);
+      })
+      .catch(() => setError("Failed to load songs."))
+      .finally(() => setLoadingMore(false));
+  }
 
   useEffect(() => {
     if (!me || !tagId) return;
@@ -139,10 +156,23 @@ function SongsInner() {
               icon="♪"
               tone={userData?.favorite ? "red" : "green"}
               image={{ type: "song", id: song.id }}
+              track={
+                song.primaryArtist
+                  ? { id: song.id, title: song.title, artist: song.primaryArtist.canonicalName }
+                  : undefined
+              }
             />
           );
         })}
       </MediaGrid>
+
+      {cursor && (
+        <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
+          <button className="btn btn-secondary" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </button>
+        </div>
+      )}
     </AppShell>
   );
 }

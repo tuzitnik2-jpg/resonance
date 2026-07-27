@@ -6,6 +6,8 @@ import { AlbumsModule } from "./albums/albums.module";
 import { AnalysesModule } from "./analyses/analyses.module";
 import { ArtistsModule } from "./artists/artists.module";
 import { ImagesModule } from "./images/images.module";
+import { LookupModule } from "./lookup/lookup.module";
+import { AssistantModule } from "./assistant/assistant.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { AuthGuard } from "./common/guards/auth.guard";
@@ -39,6 +41,8 @@ import { UsersModule } from "./users/users.module";
     UsersModule,
     ArtistsModule,
     ImagesModule,
+    LookupModule,
+    AssistantModule,
     AlbumsModule,
     SongsModule,
     TagsModule,

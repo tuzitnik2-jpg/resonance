@@ -75,6 +75,8 @@ export default function FestivalDetailPage() {
   const performances = [...(festival.performances ?? [])].sort(
     (a, b) => (a.priority ?? 99) - (b.priority ?? 99),
   );
+  const performanceById = new Map(performances.map((perf) => [perf.id, perf]));
+  const clashCount = performances.filter((perf) => (perf.collidesWith?.length ?? 0) > 0).length;
 
   return (
     <AppShell>
@@ -106,29 +108,50 @@ export default function FestivalDetailPage() {
 
       <div className="section-stack">
         <Card title="Lineup (by priority)">
+          {clashCount > 0 && (
+            <Alert tone="warning">
+              {clashCount} schedule {clashCount === 1 ? "clash" : "clashes"} in this lineup.
+            </Alert>
+          )}
           {performances.length === 0 && <EmptyState>No lineup yet.</EmptyState>}
           <ul className="list">
-            {performances.map((perf) => (
-              <li key={perf.id} className="list-row">
-                <div className="list-row-main">
-                  <Badge>{perf.priority ?? "-"}</Badge>{" "}
-                  <Link href={`/artists/${perf.artistId}`}>{perf.artist.canonicalName}</Link>
-                </div>
-                <span className="list-row-side">
-                  <label className="checkbox-row">
-                    <input
-                      type="checkbox"
-                      checked={perf.attended}
-                      onChange={() => handleToggleAttended(perf.id, perf.attended)}
-                    />
-                    Attended
-                  </label>
-                  <Button variant="danger" size="sm" onClick={() => handleRemove(perf.id)}>
-                    Remove
-                  </Button>
-                </span>
-              </li>
-            ))}
+            {performances.map((perf) => {
+              const hasClash = (perf.collidesWith?.length ?? 0) > 0;
+              const overlaps = (perf.collidesWith ?? [])
+                .map((otherId) => performanceById.get(otherId)?.artist.canonicalName)
+                .filter((name): name is string => Boolean(name))
+                .join(", ");
+              return (
+                <li key={perf.id} className="list-row">
+                  <div className="list-row-main">
+                    <Badge>{perf.priority ?? "-"}</Badge>{" "}
+                    <Link href={`/artists/${perf.artistId}`}>{perf.artist.canonicalName}</Link>
+                    {hasClash && (
+                      <>
+                        {" "}
+                        <Badge tone="danger">⚠ Clash</Badge>
+                      </>
+                    )}
+                    {hasClash && overlaps && (
+                      <div className="list-row-meta">Overlaps: {overlaps}</div>
+                    )}
+                  </div>
+                  <span className="list-row-side">
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={perf.attended}
+                        onChange={() => handleToggleAttended(perf.id, perf.attended)}
+                      />
+                      Attended
+                    </label>
+                    <Button variant="danger" size="sm" onClick={() => handleRemove(perf.id)}>
+                      Remove
+                    </Button>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
 
           <form onSubmit={handleAddPerformance} className="form-row" style={{ marginTop: "1rem" }}>

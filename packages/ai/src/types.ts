@@ -28,8 +28,15 @@ export interface AnalysisResult {
   model: string;
 }
 
+export interface AnswerQueryInput {
+  question: string;
+  /** A compact text summary of the user's library for grounding the answer. */
+  libraryContext: string;
+}
+
 export interface AIProvider {
   analyzeSong(input: AnalyzeSongInput): Promise<AnalysisResult>;
+  answer(input: AnswerQueryInput): Promise<string>;
 }
 
 /** Thrown when a provider is asked to act but isn't configured (e.g. no API key). */

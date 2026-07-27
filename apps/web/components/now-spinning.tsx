@@ -3,19 +3,25 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { listSongs, type Song } from "@/lib/api-client";
+import { usePlayer } from "./player-provider";
 
 /**
- * A Spotify-shaped bottom bar — but honest: instead of fake playback controls, it surfaces a
- * real, random track from the library ("Now Spinning") with a shuffle button that picks another.
- * Everything here links to or acts on real data.
+ * The bottom "Now Spinning" bar — a real mini-player. It surfaces a random track from the library
+ * and can play its 30-second preview; the shuffle button picks (and plays) another. When something
+ * is playing, it reflects the player's current track.
  */
 export function NowSpinning() {
+  const player = usePlayer();
   const [pool, setPool] = useState<Song[]>([]);
-  const [current, setCurrent] = useState<Song | null>(null);
+  const [pick, setPick] = useState<Song | null>(null);
 
-  function spin(songs: Song[]) {
+  function shuffle(songs: Song[], andPlay: boolean) {
     if (songs.length === 0) return;
-    setCurrent(songs[Math.floor(Math.random() * songs.length)]);
+    const next = songs[Math.floor(Math.random() * songs.length)];
+    setPick(next);
+    if (andPlay && next.primaryArtist) {
+      player.play({ id: next.id, title: next.title, artist: next.primaryArtist.canonicalName });
+    }
   }
 
   useEffect(() => {
@@ -24,27 +30,52 @@ export function NowSpinning() {
       .then((page) => {
         if (cancelled) return;
         setPool(page.items);
-        spin(page.items);
+        shuffle(page.items, false);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Prefer whatever is actually playing; fall back to the shuffled pick.
+  const shown = player.current
+    ? { id: player.current.id, title: player.current.title, artist: player.current.artist }
+    : pick
+      ? {
+          id: pick.id,
+          title: pick.title,
+          artist: pick.primaryArtist?.canonicalName ?? "—",
+        }
+      : null;
+
+  const isPlaying = player.playing;
+
+  function handleMainButton() {
+    if (player.current) {
+      player.toggle();
+    } else if (pick?.primaryArtist) {
+      player.play({ id: pick.id, title: pick.title, artist: pick.primaryArtist.canonicalName });
+    }
+  }
 
   return (
     <div className="playbar">
       <div className="playbar-track">
-        <div className="playbar-art tile-mixed vinyl-spin" aria-hidden>
+        <div className={`playbar-art tile-mixed${isPlaying ? " vinyl-spin" : ""}`} aria-hidden>
           ♫
         </div>
         <div className="playbar-meta">
-          {current ? (
+          {shown ? (
             <>
-              <Link href={`/songs/${current.id}`} className="playbar-title">
-                {current.title}
+              <Link href={`/songs/${shown.id}`} className="playbar-title">
+                {shown.title}
               </Link>
-              <div className="playbar-sub">{current.primaryArtist?.canonicalName ?? "—"}</div>
+              <div className="playbar-sub">
+                {shown.artist}
+                {player.loading ? " · loading…" : player.unavailable ? " · no preview" : ""}
+              </div>
             </>
           ) : (
             <>
@@ -59,9 +90,18 @@ export function NowSpinning() {
         <span className="playbar-label">Now Spinning</span>
         <button
           className="playbar-spin"
-          onClick={() => spin(pool)}
+          onClick={handleMainButton}
+          disabled={!shown}
+          title={isPlaying ? "Pause" : "Play"}
+          aria-label={isPlaying ? "Pause" : "Play preview"}
+        >
+          {isPlaying ? "❚❚" : "▸"}
+        </button>
+        <button
+          className="playbar-shuffle"
+          onClick={() => shuffle(pool, true)}
           disabled={pool.length === 0}
-          title="Spin again"
+          title="Spin another"
           aria-label="Spin a different track"
         >
           ⟳
@@ -69,8 +109,8 @@ export function NowSpinning() {
       </div>
 
       <div className="playbar-end">
-        {current && (
-          <Link href={`/songs/${current.id}`} className="btn btn-secondary btn-sm">
+        {shown && (
+          <Link href={`/songs/${shown.id}`} className="btn btn-secondary btn-sm">
             Open
           </Link>
         )}

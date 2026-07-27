@@ -73,6 +73,28 @@ export function deleteEntityImage(type: ImageEntity, id: string) {
   return apiFetch<void>(`/images/${type}/${id}`, { method: "DELETE" });
 }
 
+/** Ask the API to fetch a cover suggestion (iTunes) and store it for this entity. */
+export function suggestEntityImage(type: ImageEntity, id: string, artist: string, title?: string) {
+  const search = new URLSearchParams({ artist });
+  if (title) search.set("title", title);
+  return apiFetch<{ applied: boolean }>(`/images/${type}/${id}/suggest?${search.toString()}`, {
+    method: "POST",
+  });
+}
+
+/** A playable 30-second preview URL for a song (iTunes), or null. */
+export function getPreviewUrl(artist: string, title: string) {
+  const search = new URLSearchParams({ artist, title });
+  return apiFetch<{ previewUrl: string | null }>(`/lookup/preview?${search.toString()}`);
+}
+
+export function askAssistant(question: string) {
+  return apiFetch<{ answer: string }>("/assistant/query", {
+    method: "POST",
+    body: JSON.stringify({ question }),
+  });
+}
+
 export interface Me {
   userId: string;
   email: string;
@@ -177,12 +199,20 @@ export function detachArtistTag(artistId: string, tagId: string) {
   return apiFetch<void>(`/artists/${artistId}/tags/${tagId}`, { method: "DELETE" });
 }
 
+export interface AlbumTag {
+  albumId: string;
+  tagId: string;
+  tag: Tag;
+}
+
 export interface Album {
   id: string;
   artistId: string;
   title: string;
   releaseYear: number | null;
+  label: string | null;
   artist?: Artist;
+  albumTags?: AlbumTag[];
 }
 
 export function listAlbums(params: { artistId?: string; cursor?: string } = {}) {
@@ -208,11 +238,22 @@ export function getAlbum(id: string) {
   return apiFetch<Album>(`/albums/${id}`);
 }
 
-export function updateAlbum(id: string, input: Partial<{ title: string; releaseYear: number }>) {
+export function updateAlbum(
+  id: string,
+  input: Partial<{ title: string; releaseYear: number | null; label: string | null }>,
+) {
   return apiFetch<{ album: Album }>(`/albums/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+export function attachAlbumTag(albumId: string, tagId: string) {
+  return apiFetch(`/albums/${albumId}/tags`, { method: "POST", body: JSON.stringify({ tagId }) });
+}
+
+export function detachAlbumTag(albumId: string, tagId: string) {
+  return apiFetch<void>(`/albums/${albumId}/tags/${tagId}`, { method: "DELETE" });
 }
 
 export function deleteAlbum(id: string) {
@@ -458,6 +499,9 @@ export interface FestivalPerformance {
   attended: boolean;
   rating: number | null;
   note: string | null;
+  endsAt?: string | null;
+  /** IDs of other performances whose time slot overlaps this one (computed by the API). */
+  collidesWith?: string[];
   artist: Artist;
 }
 
@@ -534,13 +578,25 @@ export interface PlaylistItem {
   song: Song;
 }
 
+export interface SmartPlaylistRules {
+  minRating?: number;
+  favorite?: boolean;
+  tagId?: string;
+  yearFrom?: number;
+  yearTo?: number;
+  limit?: number;
+}
+
 export interface Playlist {
   id: string;
   name: string;
   type: string;
   description: string | null;
   externalUrl: string | null;
+  rulesJson?: SmartPlaylistRules | null;
   items?: PlaylistItem[];
+  /** For smart playlists: the songs matching the rules, computed live by the API. */
+  computed?: Song[] | null;
 }
 
 export function listPlaylists() {
@@ -551,7 +607,12 @@ export function getPlaylist(id: string) {
   return apiFetch<Playlist>(`/playlists/${id}`);
 }
 
-export function createPlaylist(input: { name: string; description?: string; type?: string }) {
+export function createPlaylist(input: {
+  name: string;
+  description?: string;
+  type?: string;
+  rulesJson?: SmartPlaylistRules | null;
+}) {
   return apiFetch<{ playlist: Playlist }>("/playlists", {
     method: "POST",
     body: JSON.stringify(input),

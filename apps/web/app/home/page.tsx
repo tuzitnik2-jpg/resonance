@@ -33,6 +33,12 @@ function songImage(song: Song) {
   return { type: "song", id: song.id } as const;
 }
 
+function songTrack(song: Song) {
+  return song.primaryArtist
+    ? { id: song.id, title: song.title, artist: song.primaryArtist.canonicalName }
+    : undefined;
+}
+
 export default function HomePage() {
   const { me, loading: authLoading } = useCurrentUser();
   const [songs, setSongs] = useState<Song[]>([]);
@@ -157,6 +163,7 @@ export default function HomePage() {
                     icon="♪"
                     tone="green"
                     image={songImage(song)}
+                    track={songTrack(song)}
                   />
                 ))}
               </MediaGrid>
@@ -175,6 +182,7 @@ export default function HomePage() {
                     icon="♥"
                     tone="red"
                     image={songImage(song)}
+                    track={songTrack(song)}
                   />
                 ))}
               </MediaGrid>
@@ -193,6 +201,7 @@ export default function HomePage() {
                     icon="♪"
                     tone="green"
                     image={songImage(song)}
+                    track={songTrack(song)}
                   />
                 ))}
               </MediaGrid>
@@ -216,6 +225,7 @@ export default function HomePage() {
                     icon="♪"
                     tone="gold"
                     image={songImage(song)}
+                    track={songTrack(song)}
                   />
                 ))}
               </MediaGrid>

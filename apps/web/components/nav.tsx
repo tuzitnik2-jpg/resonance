@@ -10,6 +10,7 @@ const primary = [
   { href: "/home", label: "Home", icon: "⌂" },
   { href: "/search", label: "Search", icon: "⌕" },
   { href: "/browse", label: "Browse", icon: "▦" },
+  { href: "/assistant", label: "Assistant", icon: "✧" },
 ];
 
 const library = [

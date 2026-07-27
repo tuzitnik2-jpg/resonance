@@ -60,6 +60,7 @@ export class AlbumsService {
           input.releaseDay,
         ),
         coverUrl: input.coverUrl,
+        label: input.label,
       },
     });
 
@@ -103,12 +104,63 @@ export class AlbumsService {
   async findOne(id: string) {
     const album = await this.prisma.album.findFirst({
       where: { id, deletedAt: null },
-      include: { artist: true },
+      include: { artist: true, albumTags: { include: { tag: true } } },
     });
     if (!album) {
       throw new NotFoundException(`Album ${id} not found.`);
     }
     return album;
+  }
+
+  async attachTag(albumId: string, tagId: string, user: AuthenticatedUser) {
+    await this.findOne(albumId);
+
+    const existing = await this.prisma.albumTag.findUnique({
+      where: { albumId_tagId: { albumId, tagId } },
+    });
+    if (existing) {
+      return { albumTag: existing, auditEventId: null };
+    }
+
+    const albumTag = await this.prisma.albumTag.create({
+      data: { albumId, tagId, source: "USER", createdBy: user.userId },
+      include: { tag: true },
+    });
+
+    const auditEventId = await this.audit.record({
+      userId: user.userId,
+      actorType: "USER",
+      actorId: user.userId,
+      action: "create",
+      entityType: "album_tag",
+      entityId: `${albumId}:${tagId}`,
+      afterJson: albumTag,
+    });
+
+    return { albumTag, auditEventId };
+  }
+
+  async detachTag(albumId: string, tagId: string, user: AuthenticatedUser) {
+    const existing = await this.prisma.albumTag.findUnique({
+      where: { albumId_tagId: { albumId, tagId } },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Album ${albumId} does not have tag ${tagId}.`);
+    }
+
+    await this.prisma.albumTag.delete({ where: { albumId_tagId: { albumId, tagId } } });
+
+    const auditEventId = await this.audit.record({
+      userId: user.userId,
+      actorType: "USER",
+      actorId: user.userId,
+      action: "delete",
+      entityType: "album_tag",
+      entityId: `${albumId}:${tagId}`,
+      beforeJson: existing,
+    });
+
+    return { auditEventId };
   }
 
   async update(id: string, input: UpdateAlbumInput, user: AuthenticatedUser) {

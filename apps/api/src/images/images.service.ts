@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { LookupService } from "../lookup/lookup.service";
 import type { AuthenticatedUser } from "../common/guards/auth.guard";
 
 export type ImageEntity = "song" | "artist" | "album";
@@ -19,6 +20,7 @@ export class ImagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly lookup: LookupService,
   ) {}
 
   private model(entity: ImageEntity) {
@@ -90,6 +92,44 @@ export class ImagesService {
       entityId: id,
       afterJson: { mimeType, bytes: buffer.length },
     });
+  }
+
+  /** Fetch a cover suggestion from iTunes by name and store it. Returns whether one was applied. */
+  async suggestImage(
+    entity: ImageEntity,
+    id: string,
+    artist: string,
+    title: string | undefined,
+    user: AuthenticatedUser,
+  ): Promise<{ applied: boolean }> {
+    const url = await this.lookup.artworkUrl(entity, artist, title);
+    if (!url) return { applied: false };
+
+    const res = await fetch(url);
+    if (!res.ok) return { applied: false };
+    const mimeType = res.headers.get("content-type") ?? "image/jpeg";
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length === 0 || buffer.length > MAX_BYTES) return { applied: false };
+
+    const model = this.model(entity) as {
+      updateMany: (args: unknown) => Promise<{ count: number }>;
+    };
+    const result = await model.updateMany({
+      where: { id, deletedAt: null },
+      data: { imageData: buffer, imageMimeType: mimeType },
+    });
+    if (result.count === 0) throw new NotFoundException(`${entity} not found`);
+
+    await this.audit.record({
+      userId: user.userId,
+      actorType: "USER",
+      actorId: user.userId,
+      action: `${entity}.image.suggest`,
+      entityType: entity,
+      entityId: id,
+      afterJson: { source: "itunes", bytes: buffer.length },
+    });
+    return { applied: true };
   }
 
   async clearImage(entity: ImageEntity, id: string, user: AuthenticatedUser): Promise<void> {

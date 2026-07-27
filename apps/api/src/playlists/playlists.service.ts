@@ -2,8 +2,10 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import type {
   AddPlaylistItemInput,
   CreatePlaylistInput,
+  SmartPlaylistRules,
   UpdatePlaylistInput,
 } from "@resonance/domain";
+import type { Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { AuthenticatedUser } from "../common/guards/auth.guard";
@@ -30,6 +32,7 @@ export class PlaylistsService {
         type: input.type,
         description: input.description,
         externalUrl: input.externalUrl,
+        rulesJson: (input.rulesJson ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
 
@@ -62,15 +65,55 @@ export class PlaylistsService {
     if (!playlist) {
       throw new NotFoundException(`Playlist ${id} not found.`);
     }
-    return playlist;
+
+    // Smart playlists compute their tracks live from their rules instead of stored items.
+    const rules = playlist.rulesJson as SmartPlaylistRules | null;
+    if (rules && Object.keys(rules).length > 0) {
+      const computed = await this.computeSmart(rules, user.userId);
+      return { ...playlist, computed };
+    }
+    return { ...playlist, computed: null };
+  }
+
+  private async computeSmart(rules: SmartPlaylistRules, userId: string) {
+    const where: Prisma.SongWhereInput = { deletedAt: null };
+    if (rules.tagId) where.songTags = { some: { tagId: rules.tagId } };
+    if (rules.yearFrom || rules.yearTo) {
+      where.releaseYear = {
+        ...(rules.yearFrom ? { gte: rules.yearFrom } : {}),
+        ...(rules.yearTo ? { lte: rules.yearTo } : {}),
+      };
+    }
+    if (rules.minRating !== undefined || rules.favorite) {
+      where.userData = {
+        some: {
+          userId,
+          ...(rules.minRating !== undefined ? { rating: { gte: rules.minRating } } : {}),
+          ...(rules.favorite ? { favorite: true } : {}),
+        },
+      };
+    }
+
+    return this.prisma.song.findMany({
+      where,
+      include: { primaryArtist: true, userData: { where: { userId } } },
+      take: rules.limit ?? 100,
+      orderBy: { title: "asc" },
+    });
   }
 
   async update(id: string, input: UpdatePlaylistInput, user: AuthenticatedUser) {
     const existing = await this.findOne(id, user);
 
+    const { rulesJson, ...rest } = input;
     const playlist = await this.prisma.playlist.update({
       where: { id },
-      data: input,
+      data: {
+        ...rest,
+        ...(rulesJson !== undefined
+          ? { rulesJson: (rulesJson ?? undefined) as Prisma.InputJsonValue | undefined }
+          : {}),
+      },
     });
 
     const auditEventId = await this.audit.record({

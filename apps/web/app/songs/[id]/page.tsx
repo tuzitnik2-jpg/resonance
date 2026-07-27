@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
-import { Alert, AppShell, Badge, Button, Card, EmptyState, Hero } from "@/components/ui";
+import {
+  Alert,
+  AppShell,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Hero,
+  MediaCard,
+  MediaGrid,
+  Shelf,
+} from "@/components/ui";
 import { ImageUploader } from "@/components/image-uploader";
 import { StarRating } from "@/components/star-rating";
 import {
@@ -22,6 +33,7 @@ import {
   listExternalLinks,
   listMemories,
   listSongAnalyses,
+  listSongs,
   listTags,
   updateSong,
   updateSongUserData,
@@ -44,6 +56,40 @@ const ANALYSIS_TYPES: AnalysisType[] = [
   "COLLECTION",
 ];
 
+type ListenEmbed = { id: string; kind: "spotify" | "youtube"; src: string };
+
+/** Build a Spotify embed URL from an open.spotify.com link or a spotify: URI, else null. */
+function spotifyEmbedSrc(url: string): string | null {
+  const web = url.match(
+    /spotify\.com\/(?:embed\/)?(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/,
+  );
+  if (web) return `https://open.spotify.com/embed/${web[1]}/${web[2]}`;
+  const uri = url.match(/spotify:(track|album|playlist|artist|episode|show):([A-Za-z0-9]+)/);
+  if (uri) return `https://open.spotify.com/embed/${uri[1]}/${uri[2]}`;
+  return null;
+}
+
+/** Extract a YouTube video id from watch/short/embed/shorts links and build an embed URL. */
+function youtubeEmbedSrc(url: string): string | null {
+  if (!/youtube\.com|youtu\.be/.test(url)) return null;
+  const short = url.match(/youtu\.be\/([A-Za-z0-9_-]+)/);
+  if (short) return `https://www.youtube.com/embed/${short[1]}`;
+  const path = url.match(/youtube\.com\/(?:embed|shorts|v)\/([A-Za-z0-9_-]+)/);
+  if (path) return `https://www.youtube.com/embed/${path[1]}`;
+  const query = url.match(/[?&]v=([A-Za-z0-9_-]+)/);
+  if (query) return `https://www.youtube.com/embed/${query[1]}`;
+  return null;
+}
+
+/** Turn an external link into an embeddable descriptor if it is a Spotify or YouTube link. */
+function toListenEmbed(link: ExternalLinkType): ListenEmbed | null {
+  const spotify = spotifyEmbedSrc(link.url);
+  if (spotify) return { id: link.id, kind: "spotify", src: spotify };
+  const youtube = youtubeEmbedSrc(link.url);
+  if (youtube) return { id: link.id, kind: "youtube", src: youtube };
+  return null;
+}
+
 export default function SongDetailPage() {
   const { me, loading: authLoading } = useCurrentUser();
   const { id } = useParams<{ id: string }>();
@@ -53,6 +99,7 @@ export default function SongDetailPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [links, setLinks] = useState<ExternalLinkType[]>([]);
   const [analyses, setAnalyses] = useState<SongAnalysis[]>([]);
+  const [related, setRelated] = useState<Song[]>([]);
   const [title, setTitle] = useState("");
   const [releaseYear, setReleaseYear] = useState("");
   const [bpm, setBpm] = useState("");
@@ -99,6 +146,28 @@ export default function SongDetailPage() {
     listTags().then((page) => setAllTags(page.items));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, id]);
+
+  // Recommendations: once the song has loaded, pull songs sharing its first tag (or, failing
+  // that, the same artist), excluding the current song. Keyed on the loaded song id so it runs
+  // once per song and not on every metadata save.
+  useEffect(() => {
+    if (!song) return;
+    const tagId = song.songTags?.[0]?.tagId;
+    const params = tagId ? { tagId } : { artistId: song.primaryArtistId };
+    let cancelled = false;
+    listSongs(params)
+      .then((page) => {
+        if (cancelled) return;
+        setRelated(page.items.filter((s) => s.id !== song.id).slice(0, 6));
+      })
+      .catch(() => {
+        if (!cancelled) setRelated([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [song?.id]);
 
   async function handleSaveDetails(event: FormEvent) {
     event.preventDefault();
@@ -224,6 +293,7 @@ export default function SongDetailPage() {
   const availableTags = allTags.filter((t) => !attachedTagIds.has(t.id));
 
   const userData = song.userData?.[0];
+  const listenEmbeds = links.map(toListenEmbed).filter((e): e is ListenEmbed => e !== null);
 
   return (
     <AppShell>
@@ -327,8 +397,42 @@ export default function SongDetailPage() {
             id={id}
             version={imageVersion}
             onChange={() => setImageVersion((v) => v + 1)}
+            suggestArtist={song.primaryArtist?.canonicalName}
+            suggestTitle={song.title}
           />
         </Card>
+
+        {listenEmbeds.length > 0 && (
+          <Card title="Listen">
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {listenEmbeds.map((embed) =>
+                embed.kind === "spotify" ? (
+                  <iframe
+                    key={embed.id}
+                    src={embed.src}
+                    width="100%"
+                    height={152}
+                    style={{ borderRadius: 12, border: "none" }}
+                    allow="encrypted-media"
+                    loading="lazy"
+                    title="Spotify player"
+                  />
+                ) : (
+                  <iframe
+                    key={embed.id}
+                    src={embed.src}
+                    width="100%"
+                    height={200}
+                    style={{ borderRadius: 12, border: "none" }}
+                    allowFullScreen
+                    loading="lazy"
+                    title="YouTube player"
+                  />
+                ),
+              )}
+            </div>
+          </Card>
+        )}
 
         <Card title="My relationship">
           <form onSubmit={handleSaveRelationship}>
@@ -553,6 +657,29 @@ export default function SongDetailPage() {
             <Link href="/inbox">AI Inbox</Link> before they&rsquo;re treated as fact.
           </p>
         </Card>
+
+        {related.length > 0 && (
+          <Shelf title="You might also like">
+            <MediaGrid>
+              {related.map((s) => (
+                <MediaCard
+                  key={s.id}
+                  href={`/songs/${s.id}`}
+                  title={s.title}
+                  subtitle={s.primaryArtist?.canonicalName}
+                  icon="♪"
+                  tone="green"
+                  image={{ type: "song", id: s.id }}
+                  track={
+                    s.primaryArtist
+                      ? { id: s.id, title: s.title, artist: s.primaryArtist.canonicalName }
+                      : undefined
+                  }
+                />
+              ))}
+            </MediaGrid>
+          </Shelf>
+        )}
       </div>
     </AppShell>
   );

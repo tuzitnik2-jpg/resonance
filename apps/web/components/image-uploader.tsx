@@ -5,6 +5,7 @@ import {
   deleteEntityImage,
   entityImageUrl,
   setEntityImage,
+  suggestEntityImage,
   type ImageEntity,
 } from "@/lib/api-client";
 import { resizeImageToBase64 } from "@/lib/resize-image";
@@ -20,12 +21,17 @@ export function ImageUploader({
   version,
   onChange,
   hasImageInitially = false,
+  suggestArtist,
+  suggestTitle,
 }: {
   type: ImageEntity;
   id: string;
   version: number;
   onChange: () => void;
   hasImageInitially?: boolean;
+  /** When set, shows a "Suggest cover" button that fetches art from iTunes by name. */
+  suggestArtist?: string;
+  suggestTitle?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -66,6 +72,25 @@ export function ImageUploader({
     }
   }
 
+  async function handleSuggest() {
+    if (!suggestArtist) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { applied } = await suggestEntityImage(type, id, suggestArtist, suggestTitle);
+      if (applied) {
+        setHasImage(true);
+        onChange();
+      } else {
+        setError("No cover was found to suggest.");
+      }
+    } catch {
+      setError("Could not fetch a suggestion.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
       <div
@@ -95,6 +120,16 @@ export function ImageUploader({
           >
             {busy ? "Uploading…" : hasImage ? "Replace image" : "Upload image"}
           </button>
+          {suggestArtist && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={busy}
+              onClick={handleSuggest}
+            >
+              Suggest cover
+            </button>
+          )}
           {hasImage && (
             <button
               type="button"

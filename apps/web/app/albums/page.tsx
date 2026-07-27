@@ -29,12 +29,31 @@ export default function AlbumsPage() {
   const [artistId, setArtistId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   function refresh() {
     listAlbums()
-      .then((page) => setAlbums(page.items))
+      .then((page) => {
+        setAlbums(page.items);
+        setCursor(page.nextCursor);
+      })
       .catch(() => setError("Failed to load albums."))
       .finally(() => setLoading(false));
+  }
+
+  async function handleLoadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await listAlbums({ cursor });
+      setAlbums((prev) => [...prev, ...page.items]);
+      setCursor(page.nextCursor);
+    } catch {
+      setError("Failed to load albums.");
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   useEffect(() => {
@@ -102,6 +121,7 @@ export default function AlbumsPage() {
               <>
                 {album.artist?.canonicalName}
                 {album.releaseYear ? ` · ${album.releaseYear}` : ""}
+                {album.label ? ` · ${album.label}` : ""}
               </>
             }
             icon="◍"
@@ -110,6 +130,13 @@ export default function AlbumsPage() {
           />
         ))}
       </MediaGrid>
+      {cursor ? (
+        <div style={{ marginTop: "1.25rem", textAlign: "center" }}>
+          <Button onClick={handleLoadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Load more"}
+          </Button>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

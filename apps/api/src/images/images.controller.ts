@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,7 +8,9 @@ import {
   HttpStatus,
   NotFoundException,
   Param,
+  Post,
   Put,
+  Query,
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
@@ -40,6 +43,19 @@ export class ImagesController {
     res.setHeader("Content-Type", image.mimeType);
     res.setHeader("Cache-Control", "private, max-age=60");
     res.send(image.data);
+  }
+
+  @Post(":entityType/:id/suggest")
+  async suggest(
+    @Param("entityType") entityType: string,
+    @Param("id") id: string,
+    @Query("artist") artist: string,
+    @Query("title") title: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ applied: boolean }> {
+    ImagesService.assertEntity(entityType);
+    if (!artist?.trim()) throw new BadRequestException("artist is required");
+    return this.images.suggestImage(entityType, id, artist.trim(), title?.trim(), user);
   }
 
   @Put(":entityType/:id")

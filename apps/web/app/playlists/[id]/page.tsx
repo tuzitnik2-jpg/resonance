@@ -14,7 +14,16 @@ import {
   type Playlist,
   type Song,
 } from "@/lib/api-client";
-import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui";
+import {
+  Alert,
+  AppShell,
+  Button,
+  Card,
+  EmptyState,
+  Hero,
+  MediaCard,
+  MediaGrid,
+} from "@/components/ui";
 
 export default function PlaylistDetailPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -71,20 +80,25 @@ export default function PlaylistDetailPage() {
 
   if (authLoading || !me || !playlist) return null;
 
+  // Smart playlists auto-populate from rules: the API returns matching songs in `computed`.
+  const isSmart = Array.isArray(playlist.computed) || playlist.type === "smart";
+  const computed = playlist.computed ?? [];
+  const trackCount = isSmart ? computed.length : (playlist.items?.length ?? 0);
+
   return (
     <AppShell>
       <Hero
         tone="green"
-        icon="☰"
-        eyebrow="Playlist"
+        icon={isSmart ? "♪" : "☰"}
+        eyebrow={isSmart ? "Smart playlist" : "Playlist"}
         title={playlist.name}
         meta={
           <>
             {playlist.description ? <span>{playlist.description}</span> : null}
             {playlist.description ? (
-              <span className="hero-dot">{playlist.items?.length ?? 0} tracks</span>
+              <span className="hero-dot">{trackCount} tracks</span>
             ) : (
-              <span>{playlist.items?.length ?? 0} tracks</span>
+              <span>{trackCount} tracks</span>
             )}
           </>
         }
@@ -96,65 +110,101 @@ export default function PlaylistDetailPage() {
       />
 
       <div className="section-stack">
-        <Card title="Songs">
-          <ul className="list">
-            {(playlist.items ?? []).map((item) => (
-              <li key={item.songId} className="list-row">
-                <Link href={`/songs/${item.songId}`} className="list-row-main">
-                  <div className="list-row-title">{item.song.title}</div>
-                  <div className="list-row-meta">{item.song.primaryArtist?.canonicalName}</div>
-                </Link>
-                <Button variant="danger" size="sm" onClick={() => handleRemove(item.songId)}>
-                  Remove
-                </Button>
-              </li>
-            ))}
-          </ul>
-          {(playlist.items ?? []).length === 0 && <EmptyState>No songs yet.</EmptyState>}
-        </Card>
-
-        <Card title="Add songs">
-          <div style={{ position: "relative" }}>
-            <input
-              placeholder="Search songs to add…"
-              value={songQuery}
-              onChange={(e) => setSongQuery(e.target.value)}
-              className="input"
-            />
-            {songQuery && songResults.length > 0 && (
-              <ul
-                className="list"
-                style={{
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--radius-sm)",
-                  marginTop: 4,
-                }}
-              >
-                {songResults.map((song) => (
-                  <li key={song.id}>
-                    <button
-                      onClick={(e) => handleAdd(e, song.id)}
-                      className="list-row"
-                      style={{
-                        width: "100%",
-                        textAlign: "left",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div className="list-row-main">
-                        <div className="list-row-title">{song.title}</div>
-                        <div className="list-row-meta">{song.primaryArtist?.canonicalName}</div>
-                      </div>
-                    </button>
+        {isSmart ? (
+          <Card title="Songs">
+            <p className="page-subtitle" style={{ marginTop: 0, marginBottom: "1rem" }}>
+              Auto-updating from rules.
+            </p>
+            {computed.length === 0 ? (
+              <EmptyState>No songs match these rules yet.</EmptyState>
+            ) : (
+              <MediaGrid>
+                {computed.map((song) => (
+                  <MediaCard
+                    key={song.id}
+                    href={`/songs/${song.id}`}
+                    title={song.title}
+                    subtitle={song.primaryArtist?.canonicalName}
+                    icon="♪"
+                    tone="green"
+                    image={{ type: "song", id: song.id }}
+                    track={
+                      song.primaryArtist
+                        ? {
+                            id: song.id,
+                            title: song.title,
+                            artist: song.primaryArtist.canonicalName,
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </MediaGrid>
+            )}
+          </Card>
+        ) : (
+          <>
+            <Card title="Songs">
+              <ul className="list">
+                {(playlist.items ?? []).map((item) => (
+                  <li key={item.songId} className="list-row">
+                    <Link href={`/songs/${item.songId}`} className="list-row-main">
+                      <div className="list-row-title">{item.song.title}</div>
+                      <div className="list-row-meta">{item.song.primaryArtist?.canonicalName}</div>
+                    </Link>
+                    <Button variant="danger" size="sm" onClick={() => handleRemove(item.songId)}>
+                      Remove
+                    </Button>
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-          {error && <Alert>{error}</Alert>}
-        </Card>
+              {(playlist.items ?? []).length === 0 && <EmptyState>No songs yet.</EmptyState>}
+            </Card>
+
+            <Card title="Add songs">
+              <div style={{ position: "relative" }}>
+                <input
+                  placeholder="Search songs to add…"
+                  value={songQuery}
+                  onChange={(e) => setSongQuery(e.target.value)}
+                  className="input"
+                />
+                {songQuery && songResults.length > 0 && (
+                  <ul
+                    className="list"
+                    style={{
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "var(--radius-sm)",
+                      marginTop: 4,
+                    }}
+                  >
+                    {songResults.map((song) => (
+                      <li key={song.id}>
+                        <button
+                          onClick={(e) => handleAdd(e, song.id)}
+                          className="list-row"
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div className="list-row-main">
+                            <div className="list-row-title">{song.title}</div>
+                            <div className="list-row-meta">{song.primaryArtist?.canonicalName}</div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              {error && <Alert>{error}</Alert>}
+            </Card>
+          </>
+        )}
       </div>
     </AppShell>
   );

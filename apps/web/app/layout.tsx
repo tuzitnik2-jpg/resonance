@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Rubik, Bebas_Neue } from "next/font/google";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 import "./globals.css";
 
 // Rubik: warm, slightly rounded workhorse for all UI/body text. latin-ext covers Czech diacritics.
@@ -23,6 +24,9 @@ const bebas = Bebas_Neue({
 export const metadata: Metadata = {
   title: "Resonance",
   description: "Osobní hudební archiv a inteligentní průvodce moderní hudbou",
+  applicationName: "Resonance",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Resonance" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 
 export const viewport: Viewport = {
@@ -35,7 +39,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="cs" className={`${rubik.variable} ${bebas.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   );
 }

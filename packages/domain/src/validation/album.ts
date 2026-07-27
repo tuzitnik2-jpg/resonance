@@ -10,6 +10,7 @@ export const createAlbumSchema = z.object({
   releaseMonth: z.number().int().min(1).max(12).optional(),
   releaseDay: z.number().int().min(1).max(31).optional(),
   coverUrl: z.string().url().optional(),
+  label: z.string().max(200).optional(),
   force: z.boolean().optional(),
 });
 export type CreateAlbumInput = z.infer<typeof createAlbumSchema>;

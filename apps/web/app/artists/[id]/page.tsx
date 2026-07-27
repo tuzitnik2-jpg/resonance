@@ -213,6 +213,7 @@ export default function ArtistDetailPage() {
             id={id}
             version={imageVersion}
             onChange={() => setImageVersion((v) => v + 1)}
+            suggestArtist={artist.canonicalName}
           />
         </Card>
 

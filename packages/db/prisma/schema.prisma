@@ -160,14 +160,16 @@ model Album {
   releaseDay       Int?              @map("release_day")
   releasePrecision ReleasePrecision? @map("release_precision")
   coverUrl         String?           @map("cover_url")
+  label            String?
   imageData        Bytes?            @map("image_data")
   imageMimeType    String?           @map("image_mime_type")
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz
 
-  artist Artist @relation(fields: [artistId], references: [id])
-  songs  Song[]
+  artist    Artist     @relation(fields: [artistId], references: [id])
+  songs     Song[]
+  albumTags AlbumTag[]
 
   @@index([artistId])
   @@index([normalizedTitle])
@@ -260,6 +262,7 @@ model Tag {
 
   songTags   SongTag[]
   artistTags ArtistTag[]
+  albumTags  AlbumTag[]
 
   @@unique([normalizedName, category])
   @@index([normalizedName])
@@ -296,6 +299,21 @@ model ArtistTag {
   @@id([artistId, tagId])
   @@index([tagId])
   @@map("artist_tags")
+}
+
+model AlbumTag {
+  albumId   String    @map("album_id") @db.Uuid
+  tagId     String    @map("tag_id") @db.Uuid
+  source    TagSource @default(USER)
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  album Album @relation(fields: [albumId], references: [id])
+  tag   Tag   @relation(fields: [tagId], references: [id])
+
+  @@id([albumId, tagId])
+  @@index([tagId])
+  @@map("album_tags")
 }
 
 /// Append-only audit trail. Application code must only ever call .create() on
@@ -410,6 +428,7 @@ model Playlist {
   type        String    @default("collection")
   description String?
   externalUrl String?   @map("external_url")
+  rulesJson   Json?     @map("rules_json")
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz

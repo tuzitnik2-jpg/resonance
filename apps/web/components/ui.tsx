@@ -3,7 +3,11 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "reac
 import { Nav } from "./nav";
 import { TopBar } from "./top-bar";
 import { NowSpinning } from "./now-spinning";
+import { PlayerProvider } from "./player-provider";
+import { CommandPalette } from "./command-palette";
 import { ImageTile, type EntityImageRef } from "./image-tile";
+import { PlayFab } from "./play-button";
+import type { PlayerTrack } from "./player-provider";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -145,6 +149,7 @@ export function MediaCard({
   tone = "green",
   round = false,
   image,
+  track,
 }: {
   href: string;
   title: ReactNode;
@@ -153,6 +158,7 @@ export function MediaCard({
   tone?: Tone;
   round?: boolean;
   image?: EntityImageRef;
+  track?: PlayerTrack;
 }) {
   return (
     <Link href={href} className="media-card">
@@ -163,9 +169,7 @@ export function MediaCard({
       />
       <div className="media-title">{title}</div>
       {subtitle !== undefined && <div className="media-sub">{subtitle}</div>}
-      <span className="play-fab" aria-hidden>
-        ▸
-      </span>
+      {track && <PlayFab track={track} />}
     </Link>
   );
 }
@@ -259,13 +263,16 @@ export function AppShell({
         ? "app-container app-container--narrow"
         : "app-container";
   return (
-    <div className="app-shell">
-      <Nav />
-      <main className="main-view">
-        <TopBar />
-        <div className={containerClass}>{children}</div>
-      </main>
-      <NowSpinning />
-    </div>
+    <PlayerProvider>
+      <div className="app-shell">
+        <Nav />
+        <main className="main-view">
+          <TopBar />
+          <div className={containerClass}>{children}</div>
+        </main>
+        <NowSpinning />
+      </div>
+      <CommandPalette />
+    </PlayerProvider>
   );
 }

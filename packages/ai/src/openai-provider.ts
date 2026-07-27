@@ -1,4 +1,4 @@
-import type { AIProvider, AnalysisResult, AnalyzeSongInput } from "./types";
+import type { AIProvider, AnalysisResult, AnalyzeSongInput, AnswerQueryInput } from "./types";
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -108,5 +108,44 @@ export class OpenAIProvider implements AIProvider {
     };
 
     return { ...parsed, model: this.model };
+  }
+
+  async answer(input: AnswerQueryInput): Promise<string> {
+    const instructions =
+      "You are the user's personal music-librarian assistant. Answer questions ONLY from the " +
+      "library data provided below; if the answer isn't in the data, say so plainly. Be concise. " +
+      "Never invent songs, artists, or facts that aren't present.\n\n--- LIBRARY ---\n" +
+      input.libraryContext;
+
+    const res = await fetch(`${this.baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: this.model,
+        input: [
+          { role: "developer", content: instructions },
+          { role: "user", content: input.question },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`OpenAI Responses API request failed (${res.status}): ${body}`);
+    }
+
+    const data = (await res.json()) as {
+      output_text?: string;
+      output?: { content?: { type: string; text?: string }[] }[];
+    };
+    const text =
+      data.output_text ??
+      data.output?.flatMap((item) => item.content ?? []).find((c) => c.type === "output_text")
+        ?.text;
+    if (!text) throw new Error("OpenAI response did not include any output text.");
+    return text;
   }
 }

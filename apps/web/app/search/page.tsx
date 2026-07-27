@@ -123,6 +123,15 @@ export default function SearchPage() {
                 icon="♪"
                 tone="green"
                 image={{ type: "song", id: song.id }}
+                track={
+                  song.primaryArtist
+                    ? {
+                        id: song.id,
+                        title: song.title,
+                        artist: song.primaryArtist.canonicalName,
+                      }
+                    : undefined
+                }
               />
             ))}
           </MediaGrid>
