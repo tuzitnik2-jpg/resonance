@@ -8,16 +8,28 @@ import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui
 import { ImageUploader } from "@/components/image-uploader";
 import {
   ApiError,
+  attachArtistTag,
+  createTag,
   deleteArtist,
+  detachArtistTag,
   enrichArtistFromMusicBrainz,
   getArtist,
   listAlbums,
   listSongs,
+  listTags,
   updateArtist,
   type Album,
   type Artist,
+  type ArtistType,
   type Song,
+  type Tag,
 } from "@/lib/api-client";
+
+const ARTIST_TYPE_LABELS: Record<ArtistType, string> = {
+  PERSON: "Person",
+  GROUP: "Group",
+  OTHER: "Other",
+};
 
 export default function ArtistDetailPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -26,23 +38,44 @@ export default function ArtistDetailPage() {
   const [artist, setArtist] = useState<Artist | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [name, setName] = useState("");
+  const [countryCode, setCountryCode] = useState("");
+  const [artistType, setArtistType] = useState("");
+  const [originCity, setOriginCity] = useState("");
+  const [beginDate, setBeginDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [description, setDescription] = useState("");
+  const [newTagId, setNewTagId] = useState("");
+  const [newTagName, setNewTagName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichMessage, setEnrichMessage] = useState<string | null>(null);
   const [imageVersion, setImageVersion] = useState(0);
 
-  useEffect(() => {
-    if (!me) return;
+  function refresh() {
     getArtist(id).then((a) => {
       setArtist(a);
       setName(a.canonicalName);
+      setCountryCode(a.countryCode ?? "");
+      setArtistType(a.artistType ?? "");
+      setOriginCity(a.originCity ?? "");
+      setBeginDate(a.beginDate ?? "");
+      setEndDate(a.endDate ?? "");
+      setWebsiteUrl(a.websiteUrl ?? "");
       setDescription(a.description ?? "");
     });
+  }
+
+  useEffect(() => {
+    if (!me) return;
+    refresh();
     listSongs({ artistId: id }).then((page) => setSongs(page.items));
     listAlbums({ artistId: id }).then((page) => setAlbums(page.items));
+    listTags().then((page) => setAllTags(page.items));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, id]);
 
   async function handleSave(event: FormEvent) {
@@ -50,13 +83,45 @@ export default function ArtistDetailPage() {
     setSaving(true);
     setError(null);
     try {
-      const result = await updateArtist(id, { canonicalName: name, description });
-      setArtist(result.artist);
+      await updateArtist(id, {
+        canonicalName: name,
+        countryCode: countryCode || null,
+        artistType: (artistType || null) as ArtistType | null,
+        originCity: originCity || null,
+        beginDate: beginDate || null,
+        endDate: endDate || null,
+        websiteUrl: websiteUrl || null,
+        description: description || null,
+      });
+      refresh();
     } catch (err) {
       setError(err instanceof ApiError ? (err.problem.detail ?? err.message) : "Save failed.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleAttachTag(event: FormEvent) {
+    event.preventDefault();
+    if (!newTagId) return;
+    await attachArtistTag(id, newTagId);
+    setNewTagId("");
+    refresh();
+  }
+
+  async function handleCreateAndAttachTag(event: FormEvent) {
+    event.preventDefault();
+    if (!newTagName) return;
+    const tag = await createTag({ name: newTagName, category: "GENRE" });
+    await attachArtistTag(id, tag.id);
+    setNewTagName("");
+    listTags().then((page) => setAllTags(page.items));
+    refresh();
+  }
+
+  async function handleDetachTag(tagId: string) {
+    await detachArtistTag(id, tagId);
+    refresh();
   }
 
   async function handleDelete() {
@@ -90,6 +155,16 @@ export default function ArtistDetailPage() {
 
   if (authLoading || !me || !artist) return null;
 
+  const attachedTagIds = new Set((artist.artistTags ?? []).map((at) => at.tagId));
+  const availableTags = allTags.filter((t) => !attachedTagIds.has(t.id));
+
+  const origin = [artist.originCity, artist.countryCode].filter(Boolean).join(", ");
+  const lifespan = artist.beginDate
+    ? artist.endDate
+      ? `${artist.beginDate} – ${artist.endDate}`
+      : artist.beginDate
+    : null;
+
   return (
     <AppShell>
       <Hero
@@ -101,7 +176,16 @@ export default function ArtistDetailPage() {
         image={{ type: "artist", id, version: imageVersion }}
         meta={
           <>
-            {artist.countryCode ? <span>{artist.countryCode}</span> : null}
+            {artist.artistType ? <span>{ARTIST_TYPE_LABELS[artist.artistType]}</span> : null}
+            {origin ? <span className="hero-dot">{origin}</span> : null}
+            {lifespan ? <span className="hero-dot">{lifespan}</span> : null}
+            {artist.websiteUrl ? (
+              <span className="hero-dot">
+                <a href={artist.websiteUrl} target="_blank" rel="noreferrer">
+                  Website
+                </a>
+              </span>
+            ) : null}
             {artist.musicbrainzId ? (
               <span className="hero-dot">
                 <a
@@ -138,6 +222,67 @@ export default function ArtistDetailPage() {
               <span className="field-label">Name</span>
               <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
             </label>
+            <div className="form-row">
+              <label className="field">
+                <span className="field-label">Type</span>
+                <select
+                  value={artistType}
+                  onChange={(e) => setArtistType(e.target.value)}
+                  className="select"
+                >
+                  <option value="">—</option>
+                  <option value="PERSON">Person</option>
+                  <option value="GROUP">Group</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Country code</span>
+                <input
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                  className="input"
+                />
+              </label>
+            </div>
+            <label className="field">
+              <span className="field-label">Origin city</span>
+              <input
+                value={originCity}
+                onChange={(e) => setOriginCity(e.target.value)}
+                className="input"
+              />
+            </label>
+            <div className="form-row">
+              <label className="field">
+                <span className="field-label">Born / formed</span>
+                <input
+                  value={beginDate}
+                  onChange={(e) => setBeginDate(e.target.value)}
+                  placeholder="e.g. 1945 or 1945-02-06"
+                  className="input"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Died / disbanded</span>
+                <input
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  placeholder="e.g. 1981 or 1981-05-11"
+                  className="input"
+                />
+              </label>
+            </div>
+            <label className="field">
+              <span className="field-label">Website</span>
+              <input
+                type="url"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="https://…"
+                className="input"
+              />
+            </label>
             <label className="field">
               <span className="field-label">Description</span>
               <textarea
@@ -150,6 +295,48 @@ export default function ArtistDetailPage() {
             {error && <Alert>{error}</Alert>}
             <Button type="submit" variant="primary" disabled={saving}>
               {saving ? "Saving…" : "Save"}
+            </Button>
+          </form>
+        </Card>
+
+        <Card title="Tags">
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: "1rem" }}>
+            {(artist.artistTags ?? []).map((at) => (
+              <span key={at.tagId} className="chip">
+                {at.tag.name}
+                <button className="chip-remove" onClick={() => handleDetachTag(at.tagId)}>
+                  ×
+                </button>
+              </span>
+            ))}
+            {(artist.artistTags ?? []).length === 0 && <EmptyState>No tags yet.</EmptyState>}
+          </div>
+          <form onSubmit={handleAttachTag} className="form-row" style={{ marginBottom: "0.6rem" }}>
+            <select
+              value={newTagId}
+              onChange={(e) => setNewTagId(e.target.value)}
+              className="select"
+            >
+              <option value="">Attach existing tag…</option>
+              {availableTags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.category}: {tag.name}
+                </option>
+              ))}
+            </select>
+            <Button type="submit" disabled={!newTagId}>
+              Attach
+            </Button>
+          </form>
+          <form onSubmit={handleCreateAndAttachTag} className="form-row">
+            <input
+              placeholder="Or create a new genre tag…"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              className="input"
+            />
+            <Button type="submit" disabled={!newTagName}>
+              Create + attach
             </Button>
           </form>
         </Card>

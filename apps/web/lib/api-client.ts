@@ -93,13 +93,38 @@ export function getMe() {
   return apiFetch<Me>("/me");
 }
 
+export type ArtistType = "PERSON" | "GROUP" | "OTHER";
+
+export interface ArtistTag {
+  artistId: string;
+  tagId: string;
+  tag: Tag;
+}
+
 export interface Artist {
   id: string;
   canonicalName: string;
   countryCode: string | null;
+  artistType: ArtistType | null;
+  originCity: string | null;
+  beginDate: string | null;
+  endDate: string | null;
+  websiteUrl: string | null;
   description: string | null;
   musicbrainzId: string | null;
   createdAt: string;
+  artistTags?: ArtistTag[];
+}
+
+export interface ArtistMetadataInput {
+  canonicalName: string;
+  countryCode: string | null;
+  artistType: ArtistType | null;
+  originCity: string | null;
+  beginDate: string | null;
+  endDate: string | null;
+  websiteUrl: string | null;
+  description: string | null;
 }
 
 export interface CursorPage<T> {
@@ -130,10 +155,7 @@ export function getArtist(id: string) {
   return apiFetch<Artist>(`/artists/${id}`);
 }
 
-export function updateArtist(
-  id: string,
-  input: Partial<{ canonicalName: string; countryCode: string; description: string }>,
-) {
+export function updateArtist(id: string, input: Partial<ArtistMetadataInput>) {
   return apiFetch<{ artist: Artist }>(`/artists/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -142,6 +164,17 @@ export function updateArtist(
 
 export function deleteArtist(id: string) {
   return apiFetch<void>(`/artists/${id}`, { method: "DELETE" });
+}
+
+export function attachArtistTag(artistId: string, tagId: string) {
+  return apiFetch(`/artists/${artistId}/tags`, {
+    method: "POST",
+    body: JSON.stringify({ tagId }),
+  });
+}
+
+export function detachArtistTag(artistId: string, tagId: string) {
+  return apiFetch<void>(`/artists/${artistId}/tags/${tagId}`, { method: "DELETE" });
 }
 
 export interface Album {
@@ -240,10 +273,28 @@ export interface Song {
   primaryArtistId: string;
   albumId: string | null;
   releaseYear: number | null;
+  bpm: number | null;
+  musicalKey: string | null;
+  label: string | null;
   primaryArtist?: Artist;
   album?: Album | null;
   songTags?: SongTag[];
   userData?: SongUserData[];
+}
+
+export interface SongMetadataInput {
+  title: string;
+  releaseYear: number | null;
+  bpm: number | null;
+  musicalKey: string | null;
+  label: string | null;
+}
+
+export function updateSong(id: string, input: Partial<SongMetadataInput>) {
+  return apiFetch<{ song: Song }>(`/songs/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export function listSongs(

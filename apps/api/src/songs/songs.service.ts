@@ -78,6 +78,9 @@ export class SongsService {
         durationMs: input.durationMs,
         languageCode: input.languageCode,
         isrc: input.isrc,
+        bpm: input.bpm,
+        musicalKey: input.musicalKey,
+        label: input.label,
         songArtists: input.extraArtists
           ? {
               create: input.extraArtists.map((extra) => ({

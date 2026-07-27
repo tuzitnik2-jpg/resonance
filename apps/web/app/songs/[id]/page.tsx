@@ -23,6 +23,7 @@ import {
   listMemories,
   listSongAnalyses,
   listTags,
+  updateSong,
   updateSongUserData,
   verifyExternalLink,
   type AnalysisType,
@@ -52,6 +53,11 @@ export default function SongDetailPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [links, setLinks] = useState<ExternalLinkType[]>([]);
   const [analyses, setAnalyses] = useState<SongAnalysis[]>([]);
+  const [title, setTitle] = useState("");
+  const [releaseYear, setReleaseYear] = useState("");
+  const [bpm, setBpm] = useState("");
+  const [musicalKey, setMusicalKey] = useState("");
+  const [label, setLabel] = useState("");
   const [rating, setRating] = useState("");
   const [favorite, setFavorite] = useState(false);
   const [energyLevel, setEnergyLevel] = useState("");
@@ -65,11 +71,17 @@ export default function SongDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [imageVersion, setImageVersion] = useState(0);
 
   function refresh() {
     getSong(id).then((s) => {
       setSong(s);
+      setTitle(s.title);
+      setReleaseYear(s.releaseYear?.toString() ?? "");
+      setBpm(s.bpm?.toString() ?? "");
+      setMusicalKey(s.musicalKey ?? "");
+      setLabel(s.label ?? "");
       const userData = s.userData?.[0];
       setRating(userData?.rating?.toString() ?? "");
       setFavorite(userData?.favorite ?? false);
@@ -87,6 +99,25 @@ export default function SongDetailPage() {
     listTags().then((page) => setAllTags(page.items));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, id]);
+
+  async function handleSaveDetails(event: FormEvent) {
+    event.preventDefault();
+    setDetailsError(null);
+    try {
+      await updateSong(id, {
+        title,
+        releaseYear: releaseYear ? Number(releaseYear) : null,
+        bpm: bpm ? Number(bpm) : null,
+        musicalKey: musicalKey || null,
+        label: label || null,
+      });
+      refresh();
+    } catch (err) {
+      setDetailsError(
+        err instanceof ApiError ? (err.problem.detail ?? err.message) : "Save failed.",
+      );
+    }
+  }
 
   async function handleSaveRelationship(event: FormEvent) {
     event.preventDefault();
@@ -215,6 +246,9 @@ export default function SongDetailPage() {
               </span>
             )}
             {song.releaseYear ? <span className="hero-dot">{song.releaseYear}</span> : null}
+            {song.bpm ? <Badge>{song.bpm} BPM</Badge> : null}
+            {song.musicalKey ? <Badge>{song.musicalKey}</Badge> : null}
+            {song.label ? <Badge>{song.label}</Badge> : null}
             {userData?.favorite ? <Badge tone="danger">♥ favorite</Badge> : null}
             {userData?.rating ? <Badge>{userData.rating}/10</Badge> : null}
           </>
@@ -227,6 +261,66 @@ export default function SongDetailPage() {
       />
 
       <div className="section-stack">
+        <Card title="Details">
+          <form onSubmit={handleSaveDetails}>
+            <div className="form-row">
+              <label className="field">
+                <span className="field-label">Title</span>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="input"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Release year</span>
+                <input
+                  type="number"
+                  value={releaseYear}
+                  onChange={(e) => setReleaseYear(e.target.value)}
+                  className="input"
+                />
+              </label>
+            </div>
+            <div className="form-row">
+              <label className="field">
+                <span className="field-label">BPM</span>
+                <input
+                  type="number"
+                  value={bpm}
+                  onChange={(e) => setBpm(e.target.value)}
+                  className="input"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Key</span>
+                <input
+                  type="text"
+                  placeholder="e.g. A minor"
+                  value={musicalKey}
+                  onChange={(e) => setMusicalKey(e.target.value)}
+                  className="input"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Label</span>
+                <input
+                  type="text"
+                  placeholder="record label"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  className="input"
+                />
+              </label>
+            </div>
+            {detailsError && <Alert>{detailsError}</Alert>}
+            <Button type="submit" variant="primary">
+              Save
+            </Button>
+          </form>
+        </Card>
+
         <Card title="Artwork">
           <ImageUploader
             type="song"

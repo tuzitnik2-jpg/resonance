@@ -12,8 +12,8 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { createArtistSchema, updateArtistSchema } from "@resonance/domain";
-import type { CreateArtistInput, UpdateArtistInput } from "@resonance/domain";
+import { attachTagSchema, createArtistSchema, updateArtistSchema } from "@resonance/domain";
+import type { AttachTagInput, CreateArtistInput, UpdateArtistInput } from "@resonance/domain";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../common/guards/auth.guard";
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe";
@@ -65,5 +65,24 @@ export class ArtistsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.artistsService.remove(id, user);
+  }
+
+  @Post(":id/tags")
+  attachTag(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(attachTagSchema)) body: AttachTagInput,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.artistsService.attachTag(id, body.tagId, user);
+  }
+
+  @Delete(":id/tags/:tagId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  detachTag(
+    @Param("id") id: string,
+    @Param("tagId") tagId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.artistsService.detachTag(id, tagId, user);
   }
 }

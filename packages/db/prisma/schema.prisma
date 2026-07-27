@@ -115,23 +115,35 @@ model User {
   @@map("users")
 }
 
+enum ArtistType {
+  PERSON
+  GROUP
+  OTHER
+}
+
 model Artist {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  canonicalName  String    @map("canonical_name")
-  normalizedName String    @map("normalized_name")
-  countryCode    String?   @map("country_code") @db.Char(2)
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonicalName  String      @map("canonical_name")
+  normalizedName String      @map("normalized_name")
+  countryCode    String?     @map("country_code") @db.Char(2)
+  artistType     ArtistType? @map("artist_type")
+  originCity     String?     @map("origin_city")
+  beginDate      String?     @map("begin_date")
+  endDate        String?     @map("end_date")
+  websiteUrl     String?     @map("website_url")
   description    String?
-  musicbrainzId  String?   @map("musicbrainz_id")
-  imageData      Bytes?    @map("image_data")
-  imageMimeType  String?   @map("image_mime_type")
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  musicbrainzId  String?     @map("musicbrainz_id")
+  imageData      Bytes?      @map("image_data")
+  imageMimeType  String?     @map("image_mime_type")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz
 
   albums               Album[]
   primarySongs         Song[]                @relation("PrimaryArtist")
   songArtistLinks      SongArtist[]
   festivalPerformances FestivalPerformance[]
+  artistTags           ArtistTag[]
 
   @@index([normalizedName])
   @@map("artists")
@@ -175,6 +187,9 @@ model Song {
   durationMs       Int?              @map("duration_ms")
   languageCode     String?           @map("language_code")
   isrc             String?
+  bpm              Int?
+  musicalKey       String?           @map("musical_key")
+  label            String?
   imageData        Bytes?            @map("image_data")
   imageMimeType    String?           @map("image_mime_type")
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
@@ -243,7 +258,8 @@ model Tag {
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz
   deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz
 
-  songTags SongTag[]
+  songTags   SongTag[]
+  artistTags ArtistTag[]
 
   @@unique([normalizedName, category])
   @@index([normalizedName])
@@ -265,6 +281,21 @@ model SongTag {
   @@id([songId, tagId])
   @@index([tagId])
   @@map("song_tags")
+}
+
+model ArtistTag {
+  artistId  String    @map("artist_id") @db.Uuid
+  tagId     String    @map("tag_id") @db.Uuid
+  source    TagSource @default(USER)
+  createdBy String?   @map("created_by") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  artist Artist @relation(fields: [artistId], references: [id])
+  tag    Tag    @relation(fields: [tagId], references: [id])
+
+  @@id([artistId, tagId])
+  @@index([tagId])
+  @@map("artist_tags")
 }
 
 /// Append-only audit trail. Application code must only ever call .create() on

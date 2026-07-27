@@ -17,6 +17,9 @@ export const createSongSchema = z.object({
   durationMs: z.number().int().positive().optional(),
   languageCode: z.string().max(10).optional(),
   isrc: z.string().optional(),
+  bpm: z.number().int().min(20).max(400).optional(),
+  musicalKey: z.string().max(20).optional(),
+  label: z.string().max(200).optional(),
   extraArtists: z.array(extraArtistSchema).optional(),
   force: z.boolean().optional(),
 });
