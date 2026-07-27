@@ -5,6 +5,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { AlbumsModule } from "./albums/albums.module";
 import { AnalysesModule } from "./analyses/analyses.module";
 import { ArtistsModule } from "./artists/artists.module";
+import { ArtworkModule } from "./artwork/artwork.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { AuthGuard } from "./common/guards/auth.guard";
@@ -37,6 +38,7 @@ import { UsersModule } from "./users/users.module";
     AuthModule,
     UsersModule,
     ArtistsModule,
+    ArtworkModule,
     AlbumsModule,
     SongsModule,
     TagsModule,

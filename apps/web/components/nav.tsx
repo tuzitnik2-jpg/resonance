@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 
 const primary = [
   { href: "/home", label: "Home", icon: "⌂" },
-  { href: "/songs", label: "Search", icon: "⌕" },
+  { href: "/search", label: "Search", icon: "⌕" },
+  { href: "/browse", label: "Browse", icon: "▦" },
 ];
 
 const library = [
+  { href: "/liked", label: "Liked Songs", icon: "♥" },
   { href: "/songs", label: "Songs", icon: "♪" },
   { href: "/artists", label: "Artists", icon: "◈" },
   { href: "/albums", label: "Albums", icon: "◍" },
@@ -40,7 +42,7 @@ export function Nav() {
             <Link
               key={link.label}
               href={link.href}
-              className={`sidebar-link${isActive(pathname, link.href) && link.href === "/home" ? " is-active" : ""}`}
+              className={`sidebar-link${isActive(pathname, link.href) ? " is-active" : ""}`}
             >
               <span className="sidebar-icon">{link.icon}</span>
               {link.label}

@@ -68,6 +68,11 @@ export default function AlbumDetailPage() {
         icon="◍"
         eyebrow="Album"
         title={album.title}
+        artwork={
+          album.artist
+            ? { type: "album", artist: album.artist.canonicalName, title: album.title }
+            : undefined
+        }
         meta={
           <>
             {album.artist && (

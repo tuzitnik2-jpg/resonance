@@ -96,6 +96,7 @@ export default function ArtistDetailPage() {
         eyebrow="Artist"
         title={artist.canonicalName}
         round
+        artwork={{ type: "artist", artist: artist.canonicalName }}
         meta={
           <>
             {artist.countryCode ? <span>{artist.countryCode}</span> : null}

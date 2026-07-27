@@ -197,6 +197,11 @@ export default function SongDetailPage() {
         tone={userData?.favorite ? "red" : "green"}
         icon="♪"
         eyebrow="Song"
+        artwork={
+          song.primaryArtist
+            ? { type: "song", artist: song.primaryArtist.canonicalName, title: song.title }
+            : undefined
+        }
         title={song.title}
         meta={
           <>

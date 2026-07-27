@@ -53,6 +53,16 @@ export async function getApiHealth(): Promise<HealthStatus | null> {
   }
 }
 
+export function getArtwork(params: {
+  type: "song" | "album" | "artist";
+  artist: string;
+  title?: string;
+}) {
+  const search = new URLSearchParams({ type: params.type, artist: params.artist });
+  if (params.title) search.set("title", params.title);
+  return apiFetch<{ imageUrl: string | null }>(`/artwork?${search.toString()}`);
+}
+
 export interface Me {
   userId: string;
   email: string;

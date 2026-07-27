@@ -85,6 +85,7 @@ export default function ArtistsPage() {
             icon="◈"
             tone="gold"
             round
+            artwork={{ type: "artist", artist: artist.canonicalName }}
           />
         ))}
       </MediaGrid>

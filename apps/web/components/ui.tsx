@@ -3,6 +3,8 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "reac
 import { Nav } from "./nav";
 import { TopBar } from "./top-bar";
 import { NowSpinning } from "./now-spinning";
+import { ArtworkTile } from "./artwork-tile";
+import type { ArtworkQuery } from "@/lib/use-artwork";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -143,6 +145,7 @@ export function MediaCard({
   icon,
   tone = "green",
   round = false,
+  artwork,
 }: {
   href: string;
   title: ReactNode;
@@ -150,10 +153,15 @@ export function MediaCard({
   icon: ReactNode;
   tone?: Tone;
   round?: boolean;
+  artwork?: ArtworkQuery;
 }) {
   return (
     <Link href={href} className="media-card">
-      <div className={`media-art ${toneTile[tone]}${round ? " media-art--round" : ""}`}>{icon}</div>
+      <ArtworkTile
+        query={artwork}
+        className={`media-art ${toneTile[tone]}${round ? " media-art--round" : ""}`}
+        icon={icon}
+      />
       <div className="media-title">{title}</div>
       {subtitle !== undefined && <div className="media-sub">{subtitle}</div>}
       <span className="play-fab" aria-hidden>
@@ -203,6 +211,7 @@ export function Hero({
   meta,
   round = false,
   actions,
+  artwork,
 }: {
   tone?: "green" | "gold" | "red";
   icon: ReactNode;
@@ -211,11 +220,16 @@ export function Hero({
   meta?: ReactNode;
   round?: boolean;
   actions?: ReactNode;
+  artwork?: ArtworkQuery;
 }) {
   return (
     <>
       <div className={`hero hero--${tone}`}>
-        <div className={`hero-art ${toneTile[tone]}${round ? " hero-art--round" : ""}`}>{icon}</div>
+        <ArtworkTile
+          query={artwork}
+          className={`hero-art ${toneTile[tone]}${round ? " hero-art--round" : ""}`}
+          icon={icon}
+        />
         <div className="hero-body">
           {eyebrow && <div className="eyebrow">{eyebrow}</div>}
           <h1 className="hero-title">{title}</h1>
