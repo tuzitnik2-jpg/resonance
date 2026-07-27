@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: resonance
+      POSTGRES_PASSWORD: resonance
+      POSTGRES_DB: resonance
+    ports:
+      - "5432:5432"
+    volumes:
+      - resonance_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resonance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    command: pnpm --filter api start:dev
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    env_file: .env
+    environment:
+      # Overrides .env's API_INTERNAL_URL: inside the compose network, the API is reachable at
+      # the "api" service name, not localhost.
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    command: pnpm --filter web dev
+
+  mcp:
+    build:
+      context: .
+      dockerfile: apps/mcp/Dockerfile
+    env_file: .env
+    depends_on:
+      - api
+    ports:
+      - "3002:3002"
+    command: pnpm --filter mcp start:dev
+
+volumes:
+  resonance_db:
