@@ -70,11 +70,7 @@ export default function SongsPage() {
               }
               icon="♪"
               tone={userData?.favorite ? "red" : "green"}
-              artwork={
-                song.primaryArtist
-                  ? { type: "song", artist: song.primaryArtist.canonicalName, title: song.title }
-                  : undefined
-              }
+              image={{ type: "song", id: song.id }}
             />
           );
         })}

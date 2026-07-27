@@ -61,7 +61,9 @@ async function handle(
     typeof upstream.headers.getSetCookie === "function" ? upstream.headers.getSetCookie() : [];
   for (const cookie of setCookies) resHeaders.append("set-cookie", cookie);
 
-  return new Response(await upstream.arrayBuffer(), {
+  // 204/205/304 responses must have a null body — the Response constructor throws otherwise.
+  const nullBody = [204, 205, 304].includes(upstream.status);
+  return new Response(nullBody ? null : await upstream.arrayBuffer(), {
     status: upstream.status,
     statusText: upstream.statusText,
     headers: resHeaders,

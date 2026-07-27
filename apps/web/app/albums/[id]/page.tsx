@@ -14,6 +14,7 @@ import {
   type Song,
 } from "@/lib/api-client";
 import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui";
+import { ImageUploader } from "@/components/image-uploader";
 
 export default function AlbumDetailPage() {
   const { me, loading: authLoading } = useCurrentUser();
@@ -25,6 +26,7 @@ export default function AlbumDetailPage() {
   const [releaseYear, setReleaseYear] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [imageVersion, setImageVersion] = useState(0);
 
   useEffect(() => {
     if (!me) return;
@@ -68,11 +70,7 @@ export default function AlbumDetailPage() {
         icon="◍"
         eyebrow="Album"
         title={album.title}
-        artwork={
-          album.artist
-            ? { type: "album", artist: album.artist.canonicalName, title: album.title }
-            : undefined
-        }
+        image={{ type: "album", id, version: imageVersion }}
         meta={
           <>
             {album.artist && (
@@ -89,6 +87,15 @@ export default function AlbumDetailPage() {
       />
 
       <div className="section-stack">
+        <Card title="Artwork">
+          <ImageUploader
+            type="album"
+            id={id}
+            version={imageVersion}
+            onChange={() => setImageVersion((v) => v + 1)}
+          />
+        </Card>
+
         <Card title="Details">
           <form onSubmit={handleSave}>
             <label className="field">

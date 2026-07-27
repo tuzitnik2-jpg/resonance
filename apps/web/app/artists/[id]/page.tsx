@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { Alert, AppShell, Button, Card, EmptyState, Hero } from "@/components/ui";
+import { ImageUploader } from "@/components/image-uploader";
 import {
   ApiError,
   deleteArtist,
@@ -31,6 +32,7 @@ export default function ArtistDetailPage() {
   const [saving, setSaving] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichMessage, setEnrichMessage] = useState<string | null>(null);
+  const [imageVersion, setImageVersion] = useState(0);
 
   useEffect(() => {
     if (!me) return;
@@ -96,7 +98,7 @@ export default function ArtistDetailPage() {
         eyebrow="Artist"
         title={artist.canonicalName}
         round
-        artwork={{ type: "artist", artist: artist.canonicalName }}
+        image={{ type: "artist", id, version: imageVersion }}
         meta={
           <>
             {artist.countryCode ? <span>{artist.countryCode}</span> : null}
@@ -121,6 +123,15 @@ export default function ArtistDetailPage() {
       />
 
       <div className="section-stack">
+        <Card title="Artwork">
+          <ImageUploader
+            type="artist"
+            id={id}
+            version={imageVersion}
+            onChange={() => setImageVersion((v) => v + 1)}
+          />
+        </Card>
+
         <Card title="Details">
           <form onSubmit={handleSave}>
             <label className="field">

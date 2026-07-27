@@ -53,14 +53,24 @@ export async function getApiHealth(): Promise<HealthStatus | null> {
   }
 }
 
-export function getArtwork(params: {
-  type: "song" | "album" | "artist";
-  artist: string;
-  title?: string;
-}) {
-  const search = new URLSearchParams({ type: params.type, artist: params.artist });
-  if (params.title) search.set("title", params.title);
-  return apiFetch<{ imageUrl: string | null }>(`/artwork?${search.toString()}`);
+export type ImageEntity = "song" | "artist" | "album";
+
+/** URL of an entity's uploaded image (served via the API proxy). `version` busts the cache. */
+export function entityImageUrl(type: ImageEntity, id: string, version?: number): string {
+  const suffix = version ? `?v=${version}` : "";
+  return `${API_BASE_URL}/api/v1/images/${type}/${id}${suffix}`;
+}
+
+/** Upload/replace an entity's image. `data` is base64 (no data: prefix). */
+export function setEntityImage(type: ImageEntity, id: string, data: string, mimeType: string) {
+  return apiFetch<void>(`/images/${type}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ data, mimeType }),
+  });
+}
+
+export function deleteEntityImage(type: ImageEntity, id: string) {
+  return apiFetch<void>(`/images/${type}/${id}`, { method: "DELETE" });
 }
 
 export interface Me {

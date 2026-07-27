@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { Alert, AppShell, Badge, Button, Card, EmptyState, Hero } from "@/components/ui";
+import { ImageUploader } from "@/components/image-uploader";
 import {
   ApiError,
   attachTag,
@@ -63,6 +64,7 @@ export default function SongDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imageVersion, setImageVersion] = useState(0);
 
   function refresh() {
     getSong(id).then((s) => {
@@ -197,11 +199,7 @@ export default function SongDetailPage() {
         tone={userData?.favorite ? "red" : "green"}
         icon="♪"
         eyebrow="Song"
-        artwork={
-          song.primaryArtist
-            ? { type: "song", artist: song.primaryArtist.canonicalName, title: song.title }
-            : undefined
-        }
+        image={{ type: "song", id, version: imageVersion }}
         title={song.title}
         meta={
           <>
@@ -228,6 +226,15 @@ export default function SongDetailPage() {
       />
 
       <div className="section-stack">
+        <Card title="Artwork">
+          <ImageUploader
+            type="song"
+            id={id}
+            version={imageVersion}
+            onChange={() => setImageVersion((v) => v + 1)}
+          />
+        </Card>
+
         <Card title="My relationship">
           <form onSubmit={handleSaveRelationship}>
             <div className="form-row">

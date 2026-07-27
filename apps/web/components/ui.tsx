@@ -3,8 +3,7 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "reac
 import { Nav } from "./nav";
 import { TopBar } from "./top-bar";
 import { NowSpinning } from "./now-spinning";
-import { ArtworkTile } from "./artwork-tile";
-import type { ArtworkQuery } from "@/lib/use-artwork";
+import { ImageTile, type EntityImageRef } from "./image-tile";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -145,7 +144,7 @@ export function MediaCard({
   icon,
   tone = "green",
   round = false,
-  artwork,
+  image,
 }: {
   href: string;
   title: ReactNode;
@@ -153,12 +152,12 @@ export function MediaCard({
   icon: ReactNode;
   tone?: Tone;
   round?: boolean;
-  artwork?: ArtworkQuery;
+  image?: EntityImageRef;
 }) {
   return (
     <Link href={href} className="media-card">
-      <ArtworkTile
-        query={artwork}
+      <ImageTile
+        image={image}
         className={`media-art ${toneTile[tone]}${round ? " media-art--round" : ""}`}
         icon={icon}
       />
@@ -211,7 +210,7 @@ export function Hero({
   meta,
   round = false,
   actions,
-  artwork,
+  image,
 }: {
   tone?: "green" | "gold" | "red";
   icon: ReactNode;
@@ -220,13 +219,13 @@ export function Hero({
   meta?: ReactNode;
   round?: boolean;
   actions?: ReactNode;
-  artwork?: ArtworkQuery;
+  image?: EntityImageRef;
 }) {
   return (
     <>
       <div className={`hero hero--${tone}`}>
-        <ArtworkTile
-          query={artwork}
+        <ImageTile
+          image={image}
           className={`hero-art ${toneTile[tone]}${round ? " hero-art--round" : ""}`}
           icon={icon}
         />

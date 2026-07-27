@@ -29,10 +29,8 @@ function greeting(): string {
   return "Good evening";
 }
 
-function songArtwork(song: Song) {
-  return song.primaryArtist
-    ? ({ type: "song", artist: song.primaryArtist.canonicalName, title: song.title } as const)
-    : undefined;
+function songImage(song: Song) {
+  return { type: "song", id: song.id } as const;
 }
 
 export default function HomePage() {
@@ -158,7 +156,7 @@ export default function HomePage() {
                     subtitle={song.primaryArtist?.canonicalName}
                     icon="♪"
                     tone="green"
-                    artwork={songArtwork(song)}
+                    image={songImage(song)}
                   />
                 ))}
               </MediaGrid>
@@ -176,7 +174,7 @@ export default function HomePage() {
                     subtitle={song.primaryArtist?.canonicalName}
                     icon="♥"
                     tone="red"
-                    artwork={songArtwork(song)}
+                    image={songImage(song)}
                   />
                 ))}
               </MediaGrid>
@@ -194,7 +192,7 @@ export default function HomePage() {
                     subtitle={song.primaryArtist?.canonicalName}
                     icon="♪"
                     tone="green"
-                    artwork={songArtwork(song)}
+                    image={songImage(song)}
                   />
                 ))}
               </MediaGrid>
@@ -217,7 +215,7 @@ export default function HomePage() {
                     }
                     icon="♪"
                     tone="gold"
-                    artwork={songArtwork(song)}
+                    image={songImage(song)}
                   />
                 ))}
               </MediaGrid>
@@ -236,7 +234,7 @@ export default function HomePage() {
                     icon="◈"
                     tone="gold"
                     round
-                    artwork={{ type: "artist", artist: artist.canonicalName }}
+                    image={{ type: "artist", id: artist.id }}
                   />
                 ))}
               </MediaGrid>
@@ -257,11 +255,7 @@ export default function HomePage() {
                     }
                     icon="◍"
                     tone="red"
-                    artwork={
-                      album.artist
-                        ? { type: "album", artist: album.artist.canonicalName, title: album.title }
-                        : undefined
-                    }
+                    image={{ type: "album", id: album.id }}
                   />
                 ))}
               </MediaGrid>

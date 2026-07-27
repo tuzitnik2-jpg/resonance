@@ -122,6 +122,8 @@ model Artist {
   countryCode    String?   @map("country_code") @db.Char(2)
   description    String?
   musicbrainzId  String?   @map("musicbrainz_id")
+  imageData      Bytes?    @map("image_data")
+  imageMimeType  String?   @map("image_mime_type")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
@@ -146,6 +148,8 @@ model Album {
   releaseDay       Int?              @map("release_day")
   releasePrecision ReleasePrecision? @map("release_precision")
   coverUrl         String?           @map("cover_url")
+  imageData        Bytes?            @map("image_data")
+  imageMimeType    String?           @map("image_mime_type")
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz
@@ -171,6 +175,8 @@ model Song {
   durationMs       Int?              @map("duration_ms")
   languageCode     String?           @map("language_code")
   isrc             String?
+  imageData        Bytes?            @map("image_data")
+  imageMimeType    String?           @map("image_mime_type")
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz

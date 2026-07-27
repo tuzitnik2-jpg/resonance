@@ -122,11 +122,7 @@ export default function SearchPage() {
                 subtitle={song.primaryArtist?.canonicalName}
                 icon="♪"
                 tone="green"
-                artwork={
-                  song.primaryArtist
-                    ? { type: "song", artist: song.primaryArtist.canonicalName, title: song.title }
-                    : undefined
-                }
+                image={{ type: "song", id: song.id }}
               />
             ))}
           </MediaGrid>
@@ -145,7 +141,7 @@ export default function SearchPage() {
                 icon="◈"
                 tone="gold"
                 round
-                artwork={{ type: "artist", artist: artist.canonicalName }}
+                image={{ type: "artist", id: artist.id }}
               />
             ))}
           </MediaGrid>
@@ -163,11 +159,7 @@ export default function SearchPage() {
                 subtitle={album.artist?.canonicalName}
                 icon="◍"
                 tone="red"
-                artwork={
-                  album.artist
-                    ? { type: "album", artist: album.artist.canonicalName, title: album.title }
-                    : undefined
-                }
+                image={{ type: "album", id: album.id }}
               />
             ))}
           </MediaGrid>

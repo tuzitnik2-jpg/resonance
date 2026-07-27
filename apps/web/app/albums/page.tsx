@@ -106,11 +106,7 @@ export default function AlbumsPage() {
             }
             icon="◍"
             tone="red"
-            artwork={
-              album.artist
-                ? { type: "album", artist: album.artist.canonicalName, title: album.title }
-                : undefined
-            }
+            image={{ type: "album", id: album.id }}
           />
         ))}
       </MediaGrid>
