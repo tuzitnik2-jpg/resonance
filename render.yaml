@@ -61,9 +61,11 @@ services:
         value: "22"
       # The browser only ever talks to the web app's own origin; Next proxies /api/v1/* to the
       # API server-side (see apps/web/next.config.js), which keeps the session cookie same-site.
-      # fromService injects the API's host (no scheme); next.config.js prepends https://.
+      #
+      # Set this manually in the resonance-web dashboard AFTER the first deploy, to the API's
+      # public URL — e.g. https://resonance-api-xxxx.onrender.com (find it on the resonance-api
+      # service page). sync:false means the blueprint will NOT overwrite your value on later
+      # deploys. (Render's `fromService` host wiring proved unreliable for a public web->web
+      # proxy, injecting an unusable value — hence an explicit URL here.)
       - key: API_INTERNAL_URL
-        fromService:
-          type: web
-          name: resonance-api
-          property: host
+        sync: false
