@@ -15,6 +15,23 @@ import { ResonanceClient } from "./resonance-client";
  * Per the doc's threat model (§13.1: "V MVP neposkytovat delete MCP tool"), no delete/remove
  * operations are exposed here at all — only reads and non-destructive creates/updates.
  */
+/**
+ * LLM clients (e.g. ChatGPT) populate unspecified optional fields with `null` rather than omitting
+ * them. Our zod schemas now accept null (.nullish()), but the Resonance API — and query strings —
+ * must not receive nulls, so strip them here before every call.
+ */
+function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== null && v !== undefined));
+}
+
+/** Normalize a Spotify URI (spotify:track:ID) or URL into a valid https URL, else return null. */
+function toSpotifyUrl(value: string): string | null {
+  const uri = value.match(/^spotify:(track|album|artist):([A-Za-z0-9]+)$/);
+  if (uri) return `https://open.spotify.com/${uri[1]}/${uri[2]}`;
+  if (/^https?:\/\//.test(value)) return value;
+  return null;
+}
+
 export function buildServer(bearerToken: string): McpServer {
   const api = new ResonanceClient(bearerToken);
   const server = new McpServer({ name: "resonance", version: "0.1.0" });
@@ -38,20 +55,20 @@ export function buildServer(bearerToken: string): McpServer {
       title: "Search songs",
       description: "Search/filter songs already in the library. Never invents results.",
       inputSchema: {
-        query: z.string().optional(),
-        artistId: z.string().uuid().optional(),
-        tagId: z.string().uuid().optional(),
-        favorite: z.boolean().optional(),
-        minRating: z.number().int().min(1).max(10).optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-        cursor: z.string().optional(),
+        query: z.string().nullish(),
+        artistId: z.string().uuid().nullish(),
+        tagId: z.string().uuid().nullish(),
+        favorite: z.boolean().nullish(),
+        minRating: z.number().int().min(1).max(10).nullish(),
+        limit: z.number().int().min(1).max(100).nullish(),
+        cursor: z.string().nullish(),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (args) => {
       const search = new URLSearchParams();
-      for (const [key, value] of Object.entries(args)) {
-        if (value !== undefined) search.set(key, String(value));
+      for (const [key, value] of Object.entries(clean(args))) {
+        search.set(key, String(value));
       }
       const result = await api.get(`/songs?${search.toString()}`);
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
@@ -82,15 +99,124 @@ export function buildServer(bearerToken: string): McpServer {
       inputSchema: {
         title: z.string().min(1).max(300),
         primaryArtistId: z.string().uuid(),
-        albumId: z.string().uuid().optional(),
-        releaseYear: z.number().int().min(1900).max(2100).optional(),
-        force: z.boolean().optional(),
+        albumId: z.string().uuid().nullish(),
+        releaseYear: z.number().int().min(1900).max(2100).nullish(),
+        force: z.boolean().nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async (args) => ({
-      content: [{ type: "text", text: JSON.stringify(await api.post("/songs", args)) }],
+      content: [{ type: "text", text: JSON.stringify(await api.post("/songs", clean(args))) }],
     }),
+  );
+
+  server.registerTool(
+    "create_artist",
+    {
+      title: "Create artist",
+      description:
+        "Adds an artist, with duplicate detection (an existing match is returned instead of a " +
+        "duplicate). Optionally attaches a Spotify link.",
+      inputSchema: {
+        name: z.string().min(1).max(200),
+        countryCode: z.string().length(2).nullish(),
+        spotifyUri: z.string().nullish(),
+        force: z.boolean().nullish(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ name, countryCode, spotifyUri, force }) => {
+      const result = (await api.post(
+        "/artists",
+        clean({ canonicalName: name, countryCode, force }),
+      )) as { artist?: { id: string } };
+      const url = spotifyUri ? toSpotifyUrl(spotifyUri) : null;
+      if (url && result.artist?.id) {
+        await api
+          .post("/external-links", {
+            entityType: "artist",
+            entityId: result.artist.id,
+            provider: "spotify",
+            url,
+          })
+          .catch(() => undefined);
+      }
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    "upsert_song_with_artists",
+    {
+      title: "Add a song, resolving artist & album by name",
+      description:
+        "The import-friendly way to add a song: give the artist (and optional album) by NAME. " +
+        "Resolves them — reusing an existing artist/album when one matches, creating it otherwise — " +
+        "then creates the song (with the API's duplicate detection). Optionally records the release " +
+        "year and a Spotify link. Use this instead of create_song when you don't have artist/album IDs.",
+      inputSchema: {
+        title: z.string().min(1).max(300),
+        artistName: z.string().min(1).max(200),
+        albumTitle: z.string().max(300).nullish(),
+        releaseYear: z.number().int().min(1900).max(2100).nullish(),
+        spotifyUri: z.string().nullish(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ title, artistName, albumTitle, releaseYear, spotifyUri }) => {
+      // 1. Resolve the artist by name (reuse a case-insensitive exact match, else create).
+      const foundArtists = (await api.get(`/artists?query=${encodeURIComponent(artistName)}`)) as {
+        items: { id: string; canonicalName: string }[];
+      };
+      let artistId = foundArtists.items.find(
+        (a) => a.canonicalName.toLowerCase() === artistName.toLowerCase(),
+      )?.id;
+      if (!artistId) {
+        const created = (await api.post("/artists", { canonicalName: artistName })) as {
+          artist: { id: string };
+        };
+        artistId = created.artist.id;
+      }
+
+      // 2. Optionally resolve/create the album under that artist.
+      let albumId: string | undefined;
+      if (albumTitle) {
+        const albums = (await api.get(`/albums?artistId=${artistId}`)) as {
+          items: { id: string; title: string }[];
+        };
+        albumId = albums.items.find((a) => a.title.toLowerCase() === albumTitle.toLowerCase())?.id;
+        if (!albumId) {
+          const createdAlbum = (await api.post(
+            "/albums",
+            clean({ artistId, title: albumTitle, releaseYear }),
+          )) as { album: { id: string } };
+          albumId = createdAlbum.album.id;
+        }
+      }
+
+      // 3. Create the song (duplicate detection is enforced by the API).
+      const songResult = (await api.post(
+        "/songs",
+        clean({ title, primaryArtistId: artistId, albumId, releaseYear }),
+      )) as { song?: { id: string } };
+
+      // 4. Optionally attach the Spotify link to the song.
+      const url = spotifyUri ? toSpotifyUrl(spotifyUri) : null;
+      if (url && songResult.song?.id) {
+        await api
+          .post("/external-links", {
+            entityType: "song",
+            entityId: songResult.song.id,
+            provider: "spotify",
+            url,
+          })
+          .catch(() => undefined);
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ...songResult, artistId, albumId }) }],
+      };
+    },
   );
 
   server.registerTool(
@@ -101,14 +227,16 @@ export function buildServer(bearerToken: string): McpServer {
         "Edits objective song data (title, album, release date, etc.) — not personal data.",
       inputSchema: {
         songId: z.string().uuid(),
-        title: z.string().min(1).max(300).optional(),
-        albumId: z.string().uuid().optional(),
-        releaseYear: z.number().int().min(1900).max(2100).optional(),
+        title: z.string().min(1).max(300).nullish(),
+        albumId: z.string().uuid().nullish(),
+        releaseYear: z.number().int().min(1900).max(2100).nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
     async ({ songId, ...body }) => ({
-      content: [{ type: "text", text: JSON.stringify(await api.patch(`/songs/${songId}`, body)) }],
+      content: [
+        { type: "text", text: JSON.stringify(await api.patch(`/songs/${songId}`, clean(body))) },
+      ],
     }),
   );
 
@@ -121,16 +249,19 @@ export function buildServer(bearerToken: string): McpServer {
         "always summarize the change and get explicit confirmation before calling this.",
       inputSchema: {
         songId: z.string().uuid(),
-        rating: z.number().int().min(1).max(10).nullable().optional(),
-        energyLevel: z.number().int().min(1).max(10).nullable().optional(),
-        favorite: z.boolean().optional(),
-        userNote: z.string().max(4000).nullable().optional(),
+        rating: z.number().int().min(1).max(10).nullable().nullish(),
+        energyLevel: z.number().int().min(1).max(10).nullable().nullish(),
+        favorite: z.boolean().nullish(),
+        userNote: z.string().max(4000).nullable().nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
     async ({ songId, ...body }) => ({
       content: [
-        { type: "text", text: JSON.stringify(await api.patch(`/songs/${songId}/user-data`, body)) },
+        {
+          type: "text",
+          text: JSON.stringify(await api.patch(`/songs/${songId}/user-data`, clean(body))),
+        },
       ],
     }),
   );
@@ -145,14 +276,14 @@ export function buildServer(bearerToken: string): McpServer {
         entityType: z.enum(["song", "artist", "album", "festival"]),
         entityId: z.string().uuid(),
         title: z.string().min(1).max(200),
-        body: z.string().max(4000).optional(),
-        occurredOn: z.string().date().optional(),
-        location: z.string().max(200).optional(),
+        body: z.string().max(4000).nullish(),
+        occurredOn: z.string().date().nullish(),
+        location: z.string().max(200).nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async (args) => ({
-      content: [{ type: "text", text: JSON.stringify(await api.post("/memories", args)) }],
+      content: [{ type: "text", text: JSON.stringify(await api.post("/memories", clean(args))) }],
     }),
   );
 
@@ -175,18 +306,21 @@ export function buildServer(bearerToken: string): McpServer {
           "FESTIVAL",
           "COLLECTION",
         ]),
-        summary: z.string().max(4000).optional(),
+        summary: z.string().max(4000).nullish(),
         structuredData: z.record(z.unknown()),
-        confidence: z.number().min(0).max(1).optional(),
+        confidence: z.number().min(0).max(1).nullish(),
         sources: z
-          .array(z.object({ title: z.string(), url: z.string().url().optional() }))
-          .optional(),
+          .array(z.object({ title: z.string(), url: z.string().url().nullish() }))
+          .nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async ({ songId, ...body }) => ({
       content: [
-        { type: "text", text: JSON.stringify(await api.post(`/songs/${songId}/analyses`, body)) },
+        {
+          type: "text",
+          text: JSON.stringify(await api.post(`/songs/${songId}/analyses`, clean(body))),
+        },
       ],
     }),
   );
@@ -213,15 +347,15 @@ export function buildServer(bearerToken: string): McpServer {
       title: "Search artists",
       description: "Search artists already in the library.",
       inputSchema: {
-        query: z.string().optional(),
-        limit: z.number().int().min(1).max(100).optional(),
+        query: z.string().nullish(),
+        limit: z.number().int().min(1).max(100).nullish(),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (args) => {
       const search = new URLSearchParams();
-      for (const [key, value] of Object.entries(args)) {
-        if (value !== undefined) search.set(key, String(value));
+      for (const [key, value] of Object.entries(clean(args))) {
+        search.set(key, String(value));
       }
       return {
         content: [
@@ -252,12 +386,12 @@ export function buildServer(bearerToken: string): McpServer {
       description: "Creates a new internal playlist/collection, empty to start.",
       inputSchema: {
         name: z.string().min(1).max(200),
-        description: z.string().max(2000).optional(),
+        description: z.string().max(2000).nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async (args) => ({
-      content: [{ type: "text", text: JSON.stringify(await api.post("/playlists", args)) }],
+      content: [{ type: "text", text: JSON.stringify(await api.post("/playlists", clean(args))) }],
     }),
   );
 
