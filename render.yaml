@@ -68,3 +68,20 @@ services:
       # change this value (find it on the resonance-api service page).
       - key: API_INTERNAL_URL
         value: https://resonance-api-l7wu.onrender.com
+
+  # ---- MCP server (for the ChatGPT connector) ----------------------------
+  - type: web
+    name: resonance-mcp
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=mcp
+    startCommand: pnpm --filter mcp start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Where the MCP server reaches the API (public onrender.com URL). Update if the API URL
+      # differs on your deployment.
+      - key: RESONANCE_API_URL
+        value: https://resonance-api-l7wu.onrender.com
