@@ -26,6 +26,7 @@ function releasePrecisionOf(
 const songInclude = (userId: string) => ({
   primaryArtist: true,
   album: true,
+  songArtists: { include: { artist: true } },
   songTags: { include: { tag: true } },
   userData: { where: { userId } },
 });

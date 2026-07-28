@@ -32,6 +32,118 @@ function toSpotifyUrl(value: string): string | null {
   return null;
 }
 
+/** Derive the list of artist names from any of the accepted shapes (array, or comma-joined string). */
+function toArtistNames(row: {
+  artistNames?: string[] | null;
+  artist?: string | null;
+  artistName?: string | null;
+}): string[] {
+  if (row.artistNames && row.artistNames.length) {
+    return row.artistNames.map((n) => n.trim()).filter(Boolean);
+  }
+  const joined = row.artist ?? row.artistName;
+  if (joined)
+    return joined
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean);
+  return [];
+}
+
+type ArtistCache = Map<string, string>;
+
+/** Resolve an artist name to an id — reusing an existing match or a same-run cache, else creating. */
+async function resolveArtist(
+  api: ResonanceClient,
+  cache: ArtistCache,
+  name: string,
+): Promise<string> {
+  const key = name.toLowerCase();
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const found = (await api.get(`/artists?query=${encodeURIComponent(name)}`)) as {
+    items: { id: string; canonicalName: string }[];
+  };
+  let id = found.items.find((a) => a.canonicalName.toLowerCase() === key)?.id;
+  if (!id) {
+    const created = (await api.post("/artists", { canonicalName: name })) as {
+      artist: { id: string };
+    };
+    id = created.artist.id;
+  }
+  cache.set(key, id);
+  return id;
+}
+
+interface UpsertRow {
+  title: string;
+  artistNames: string[];
+  albumTitle?: string | null;
+  releaseYear?: number | null;
+  spotifyUri?: string | null;
+}
+
+/**
+ * The core import step: resolve one or more artists by NAME (first = primary, the rest attached as
+ * featured), resolve/create the album under the primary artist, create the song (with the API's
+ * duplicate detection), and optionally attach a Spotify link.
+ */
+async function upsertSong(api: ResonanceClient, cache: ArtistCache, row: UpsertRow) {
+  const names = row.artistNames.map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0) throw new Error("at least one artist name is required");
+
+  const ids: string[] = [];
+  for (const name of names) ids.push(await resolveArtist(api, cache, name));
+  const [primaryArtistId, ...extraIds] = ids;
+
+  let albumId: string | undefined;
+  if (row.albumTitle) {
+    const albums = (await api.get(`/albums?artistId=${primaryArtistId}`)) as {
+      items: { id: string; title: string }[];
+    };
+    albumId = albums.items.find((a) => a.title.toLowerCase() === row.albumTitle!.toLowerCase())?.id;
+    if (!albumId) {
+      const created = (await api.post(
+        "/albums",
+        clean({ artistId: primaryArtistId, title: row.albumTitle, releaseYear: row.releaseYear }),
+      )) as { album: { id: string } };
+      albumId = created.album.id;
+    }
+  }
+
+  const songResult = (await api.post(
+    "/songs",
+    clean({
+      title: row.title,
+      primaryArtistId,
+      albumId,
+      releaseYear: row.releaseYear,
+      extraArtists: extraIds.length
+        ? extraIds.map((artistId) => ({ artistId, role: "featured" }))
+        : undefined,
+    }),
+  )) as { song?: { id: string }; created?: boolean };
+
+  const url = row.spotifyUri ? toSpotifyUrl(row.spotifyUri) : null;
+  if (url && songResult.song?.id) {
+    await api
+      .post("/external-links", {
+        entityType: "song",
+        entityId: songResult.song.id,
+        provider: "spotify",
+        url,
+      })
+      .catch(() => undefined);
+  }
+
+  return {
+    songId: songResult.song?.id,
+    created: songResult.created !== false,
+    artistIds: ids,
+    albumId,
+  };
+}
+
 export function buildServer(bearerToken: string): McpServer {
   const api = new ResonanceClient(bearerToken);
   const server = new McpServer({ name: "resonance", version: "0.1.0" });
@@ -148,74 +260,102 @@ export function buildServer(bearerToken: string): McpServer {
   server.registerTool(
     "upsert_song_with_artists",
     {
-      title: "Add a song, resolving artist & album by name",
+      title: "Add a song, resolving artist(s) & album by name",
       description:
-        "The import-friendly way to add a song: give the artist (and optional album) by NAME. " +
-        "Resolves them — reusing an existing artist/album when one matches, creating it otherwise — " +
-        "then creates the song (with the API's duplicate detection). Optionally records the release " +
-        "year and a Spotify link. Use this instead of create_song when you don't have artist/album IDs.",
+        "The import-friendly way to add ONE song: give the artist(s) and optional album by NAME. " +
+        'Supply MULTIPLE artists via artistNames (e.g. ["Sara Lugo", "Protoje"]) — the first ' +
+        "becomes the primary artist and the rest are attached as featured. Each artist/album is " +
+        "reused if it already exists, else created; then the song is created (with duplicate " +
+        "detection). Optionally records the release year and a Spotify link. To load many rows at " +
+        "once, use import_songs instead.",
       inputSchema: {
         title: z.string().min(1).max(300),
-        artistName: z.string().min(1).max(200),
+        artistNames: z.array(z.string().min(1).max(200)).nullish(),
+        artistName: z.string().min(1).max(200).nullish(),
         albumTitle: z.string().max(300).nullish(),
         releaseYear: z.number().int().min(1900).max(2100).nullish(),
         spotifyUri: z.string().nullish(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
-    async ({ title, artistName, albumTitle, releaseYear, spotifyUri }) => {
-      // 1. Resolve the artist by name (reuse a case-insensitive exact match, else create).
-      const foundArtists = (await api.get(`/artists?query=${encodeURIComponent(artistName)}`)) as {
-        items: { id: string; canonicalName: string }[];
-      };
-      let artistId = foundArtists.items.find(
-        (a) => a.canonicalName.toLowerCase() === artistName.toLowerCase(),
-      )?.id;
-      if (!artistId) {
-        const created = (await api.post("/artists", { canonicalName: artistName })) as {
-          artist: { id: string };
-        };
-        artistId = created.artist.id;
-      }
+    async ({ title, artistNames, artistName, albumTitle, releaseYear, spotifyUri }) => {
+      const names = toArtistNames({ artistNames, artistName });
+      const result = await upsertSong(api, new Map(), {
+        title,
+        artistNames: names,
+        albumTitle,
+        releaseYear,
+        spotifyUri,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
 
-      // 2. Optionally resolve/create the album under that artist.
-      let albumId: string | undefined;
-      if (albumTitle) {
-        const albums = (await api.get(`/albums?artistId=${artistId}`)) as {
-          items: { id: string; title: string }[];
-        };
-        albumId = albums.items.find((a) => a.title.toLowerCase() === albumTitle.toLowerCase())?.id;
-        if (!albumId) {
-          const createdAlbum = (await api.post(
-            "/albums",
-            clean({ artistId, title: albumTitle, releaseYear }),
-          )) as { album: { id: string } };
-          albumId = createdAlbum.album.id;
+  server.registerTool(
+    "import_songs",
+    {
+      title: "Bulk-import songs (e.g. a Spotify export)",
+      description:
+        "Imports many songs in one call. Each row gives the song by NAME(s) — multiple artists via " +
+        'artistNames (array) OR artist (a comma-separated string like "Sara Lugo, Protoje", which ' +
+        "is split automatically). The first artist is primary, the rest are featured. Artists and " +
+        "albums are reused when they exist, else created; songs use the API's duplicate detection " +
+        "(re-running is safe). Returns a per-row summary. Send at most ~50 rows per call and repeat " +
+        "for large libraries.",
+      inputSchema: {
+        rows: z
+          .array(
+            z.object({
+              title: z.string().min(1).max(300),
+              artistNames: z.array(z.string()).nullish(),
+              artist: z.string().nullish(),
+              albumTitle: z.string().max(300).nullish(),
+              releaseYear: z.number().int().min(1900).max(2100).nullish(),
+              spotifyUri: z.string().nullish(),
+            }),
+          )
+          .min(1)
+          .max(100),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    },
+    async ({ rows }) => {
+      const cache: ArtistCache = new Map();
+      const results: { title: string; status: string; songId?: string; error?: string }[] = [];
+      for (const row of rows) {
+        const names = toArtistNames(row);
+        if (names.length === 0) {
+          results.push({ title: row.title, status: "error", error: "no artist name" });
+          continue;
+        }
+        try {
+          const r = await upsertSong(api, cache, {
+            title: row.title,
+            artistNames: names,
+            albumTitle: row.albumTitle,
+            releaseYear: row.releaseYear,
+            spotifyUri: row.spotifyUri,
+          });
+          results.push({
+            title: row.title,
+            status: r.created ? "created" : "duplicate",
+            songId: r.songId,
+          });
+        } catch (err) {
+          results.push({
+            title: row.title,
+            status: "error",
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
-
-      // 3. Create the song (duplicate detection is enforced by the API).
-      const songResult = (await api.post(
-        "/songs",
-        clean({ title, primaryArtistId: artistId, albumId, releaseYear }),
-      )) as { song?: { id: string } };
-
-      // 4. Optionally attach the Spotify link to the song.
-      const url = spotifyUri ? toSpotifyUrl(spotifyUri) : null;
-      if (url && songResult.song?.id) {
-        await api
-          .post("/external-links", {
-            entityType: "song",
-            entityId: songResult.song.id,
-            provider: "spotify",
-            url,
-          })
-          .catch(() => undefined);
-      }
-
-      return {
-        content: [{ type: "text", text: JSON.stringify({ ...songResult, artistId, albumId }) }],
+      const summary = {
+        total: results.length,
+        created: results.filter((r) => r.status === "created").length,
+        duplicates: results.filter((r) => r.status === "duplicate").length,
+        errors: results.filter((r) => r.status === "error").length,
       };
+      return { content: [{ type: "text", text: JSON.stringify({ summary, results }) }] };
     },
   );
 
