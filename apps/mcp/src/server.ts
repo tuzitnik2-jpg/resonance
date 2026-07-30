@@ -24,6 +24,29 @@ function clean<T extends Record<string, unknown>>(obj: T): Record<string, unknow
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== null && v !== undefined));
 }
 
+/**
+ * LLM / JSON-RPC clients routinely send optional values with the "wrong" JSON type: a number as the
+ * string "25", a boolean as "true"/"false", or an empty string "" instead of omitting the field.
+ * Plain .nullish() only tolerated null, so those still produced INVALID_ARGUMENT (e.g. ChatGPT
+ * calling search_songs with limit:"25"). These coercing helpers accept those shapes, while the JSON
+ * schema the client sees stays a clean number / boolean / uuid (zod renders the inner type).
+ */
+const emptyToUndef = (v: unknown) => (v === "" ? undefined : v);
+const toNumber = (v: unknown) =>
+  typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v)) ? Number(v) : v === "" ? undefined : v;
+
+const optStr = () => z.preprocess(emptyToUndef, z.string().nullish());
+const optUuid = () => z.preprocess(emptyToUndef, z.string().uuid().nullish());
+const optInt = (min: number, max: number) =>
+  z.preprocess(toNumber, z.number().int().min(min).max(max).nullish());
+const optNum = (min: number, max: number) =>
+  z.preprocess(toNumber, z.number().min(min).max(max).nullish());
+const optBool = () =>
+  z.preprocess(
+    (v) => (v === "true" ? true : v === "false" ? false : v === "" ? undefined : v),
+    z.boolean().nullish(),
+  );
+
 /** Normalize a Spotify URI (spotify:track:ID) or URL into a valid https URL, else return null. */
 function toSpotifyUrl(value: string): string | null {
   const uri = value.match(/^spotify:(track|album|artist):([A-Za-z0-9]+)$/);
@@ -167,13 +190,13 @@ export function buildServer(bearerToken: string): McpServer {
       title: "Search songs",
       description: "Search/filter songs already in the library. Never invents results.",
       inputSchema: {
-        query: z.string().nullish(),
-        artistId: z.string().uuid().nullish(),
-        tagId: z.string().uuid().nullish(),
-        favorite: z.boolean().nullish(),
-        minRating: z.number().int().min(1).max(10).nullish(),
-        limit: z.number().int().min(1).max(100).nullish(),
-        cursor: z.string().nullish(),
+        query: optStr(),
+        artistId: optUuid(),
+        tagId: optUuid(),
+        favorite: optBool(),
+        minRating: optInt(1, 10),
+        limit: optInt(1, 100),
+        cursor: optStr(),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -211,9 +234,9 @@ export function buildServer(bearerToken: string): McpServer {
       inputSchema: {
         title: z.string().min(1).max(300),
         primaryArtistId: z.string().uuid(),
-        albumId: z.string().uuid().nullish(),
-        releaseYear: z.number().int().min(1900).max(2100).nullish(),
-        force: z.boolean().nullish(),
+        albumId: optUuid(),
+        releaseYear: optInt(1900, 2100),
+        force: optBool(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
@@ -231,9 +254,9 @@ export function buildServer(bearerToken: string): McpServer {
         "duplicate). Optionally attaches a Spotify link.",
       inputSchema: {
         name: z.string().min(1).max(200),
-        countryCode: z.string().length(2).nullish(),
-        spotifyUri: z.string().nullish(),
-        force: z.boolean().nullish(),
+        countryCode: z.preprocess(emptyToUndef, z.string().length(2).nullish()),
+        spotifyUri: optStr(),
+        force: optBool(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
@@ -271,10 +294,10 @@ export function buildServer(bearerToken: string): McpServer {
       inputSchema: {
         title: z.string().min(1).max(300),
         artistNames: z.array(z.string().min(1).max(200)).nullish(),
-        artistName: z.string().min(1).max(200).nullish(),
-        albumTitle: z.string().max(300).nullish(),
-        releaseYear: z.number().int().min(1900).max(2100).nullish(),
-        spotifyUri: z.string().nullish(),
+        artistName: optStr(),
+        albumTitle: optStr(),
+        releaseYear: optInt(1900, 2100),
+        spotifyUri: optStr(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
@@ -308,10 +331,10 @@ export function buildServer(bearerToken: string): McpServer {
             z.object({
               title: z.string().min(1).max(300),
               artistNames: z.array(z.string()).nullish(),
-              artist: z.string().nullish(),
-              albumTitle: z.string().max(300).nullish(),
-              releaseYear: z.number().int().min(1900).max(2100).nullish(),
-              spotifyUri: z.string().nullish(),
+              artist: optStr(),
+              albumTitle: optStr(),
+              releaseYear: optInt(1900, 2100),
+              spotifyUri: optStr(),
             }),
           )
           .min(1)
@@ -367,9 +390,9 @@ export function buildServer(bearerToken: string): McpServer {
         "Edits objective song data (title, album, release date, etc.) — not personal data.",
       inputSchema: {
         songId: z.string().uuid(),
-        title: z.string().min(1).max(300).nullish(),
-        albumId: z.string().uuid().nullish(),
-        releaseYear: z.number().int().min(1900).max(2100).nullish(),
+        title: optStr(),
+        albumId: optUuid(),
+        releaseYear: optInt(1900, 2100),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
@@ -389,10 +412,10 @@ export function buildServer(bearerToken: string): McpServer {
         "always summarize the change and get explicit confirmation before calling this.",
       inputSchema: {
         songId: z.string().uuid(),
-        rating: z.number().int().min(1).max(10).nullable().nullish(),
-        energyLevel: z.number().int().min(1).max(10).nullable().nullish(),
-        favorite: z.boolean().nullish(),
-        userNote: z.string().max(4000).nullable().nullish(),
+        rating: optInt(1, 10),
+        energyLevel: optInt(1, 10),
+        favorite: optBool(),
+        userNote: optStr(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
@@ -416,9 +439,9 @@ export function buildServer(bearerToken: string): McpServer {
         entityType: z.enum(["song", "artist", "album", "festival"]),
         entityId: z.string().uuid(),
         title: z.string().min(1).max(200),
-        body: z.string().max(4000).nullish(),
-        occurredOn: z.string().date().nullish(),
-        location: z.string().max(200).nullish(),
+        body: optStr(),
+        occurredOn: z.preprocess(emptyToUndef, z.string().date().nullish()),
+        location: optStr(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
@@ -446,9 +469,9 @@ export function buildServer(bearerToken: string): McpServer {
           "FESTIVAL",
           "COLLECTION",
         ]),
-        summary: z.string().max(4000).nullish(),
+        summary: optStr(),
         structuredData: z.record(z.unknown()),
-        confidence: z.number().min(0).max(1).nullish(),
+        confidence: optNum(0, 1),
         sources: z
           .array(z.object({ title: z.string(), url: z.string().url().nullish() }))
           .nullish(),
@@ -487,8 +510,8 @@ export function buildServer(bearerToken: string): McpServer {
       title: "Search artists",
       description: "Search artists already in the library.",
       inputSchema: {
-        query: z.string().nullish(),
-        limit: z.number().int().min(1).max(100).nullish(),
+        query: optStr(),
+        limit: optInt(1, 100),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -526,7 +549,7 @@ export function buildServer(bearerToken: string): McpServer {
       description: "Creates a new internal playlist/collection, empty to start.",
       inputSchema: {
         name: z.string().min(1).max(200),
-        description: z.string().max(2000).nullish(),
+        description: optStr(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, login } from "@/lib/api-client";
 import { Alert, Button, Field } from "@/components/ui";
@@ -11,18 +11,32 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // On the free tier the API can be asleep; the first request may take up to a minute to wake it.
+  const [waking, setWaking] = useState(false);
+  const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (wakeTimer.current) clearTimeout(wakeTimer.current);
+    },
+    [],
+  );
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
+    setWaking(false);
+    wakeTimer.current = setTimeout(() => setWaking(true), 4000);
     try {
       await login(email, password);
       router.replace("/home");
     } catch (err) {
       setError(err instanceof ApiError ? (err.problem.detail ?? err.message) : "Login failed.");
     } finally {
+      if (wakeTimer.current) clearTimeout(wakeTimer.current);
       setSubmitting(false);
+      setWaking(false);
     }
   }
 
@@ -70,6 +84,12 @@ export default function LoginPage() {
           >
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
+          {waking && (
+            <p className="text-muted" style={{ marginTop: "0.75rem", fontSize: "0.82rem" }}>
+              Waking the server (free tier) — this first request can take up to a minute. Hang
+              tight…
+            </p>
+          )}
         </form>
       </div>
     </div>

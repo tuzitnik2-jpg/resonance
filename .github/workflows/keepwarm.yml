@@ -1,0 +1,23 @@
+name: keep-warm
+
+# Render's free tier spins services down after ~15 min of inactivity, which makes the first
+# request (e.g. signing in) wait 30-60s while they cold-start. This pings them every ~10 minutes
+# so they stay awake. GitHub cron timing is best-effort (can drift a few minutes) but good enough.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API + web + MCP
+        run: |
+          for url in \
+            "https://resonance-api-l7wu.onrender.com/api/v1/health" \
+            "https://resonance-web.onrender.com/login" \
+            "https://resonance-mcp.onrender.com/health"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$url" || echo "000")
+            echo "$url -> $code"
+          done
