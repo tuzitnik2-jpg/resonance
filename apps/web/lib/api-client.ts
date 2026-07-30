@@ -159,6 +159,16 @@ export interface DuplicateWarning {
   message: string;
 }
 
+export interface LibraryContext {
+  libraryStats: { songs: number; artists: number; albums: number; favorites: number };
+  pendingProposalsCount: number;
+}
+
+/** Small cacheable snapshot of the library — real DB totals, not page lengths. */
+export function getContext() {
+  return apiFetch<LibraryContext>("/context");
+}
+
 export function listArtists(params: { query?: string; cursor?: string } = {}) {
   const search = new URLSearchParams();
   if (params.query) search.set("query", params.query);

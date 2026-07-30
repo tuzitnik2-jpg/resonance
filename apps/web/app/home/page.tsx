@@ -12,12 +12,14 @@ import {
   Shelf,
 } from "@/components/ui";
 import {
+  getContext,
   listAlbums,
   listArtists,
   listPlaylists,
   listSongs,
   type Album,
   type Artist,
+  type LibraryContext,
   type Playlist,
   type Song,
 } from "@/lib/api-client";
@@ -46,6 +48,7 @@ export default function HomePage() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [stats, setStats] = useState<LibraryContext["libraryStats"] | null>(null);
   const [featured, setFeatured] = useState<Song | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
@@ -57,13 +60,15 @@ export default function HomePage() {
       listArtists(),
       listAlbums({}),
       listPlaylists(),
+      getContext(),
     ])
-      .then(([s, f, ar, al, pl]) => {
+      .then(([s, f, ar, al, pl, ctx]) => {
         setSongs(s.items);
         setFavorites(f.items);
         setArtists(ar.items);
         setAlbums(al.items);
         setPlaylists(pl.items);
+        setStats(ctx.libraryStats);
         // Pick the highlighted song here (in an async callback), not during render —
         // Math.random is impure and must not run in the render path.
         const pool = f.items.length > 0 ? f.items : s.items;
@@ -109,19 +114,19 @@ export default function HomePage() {
           {/* Quick stats */}
           <div className="stat-grid" style={{ marginBottom: "2rem" }}>
             <div className="stat-card">
-              <div className="stat-value">{songs.length}</div>
+              <div className="stat-value">{stats?.songs ?? songs.length}</div>
               <div className="stat-label">Songs</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{artists.length}</div>
+              <div className="stat-value">{stats?.artists ?? artists.length}</div>
               <div className="stat-label">Artists</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{albums.length}</div>
+              <div className="stat-value">{stats?.albums ?? albums.length}</div>
               <div className="stat-label">Albums</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{favorites.length}</div>
+              <div className="stat-value">{stats?.favorites ?? favorites.length}</div>
               <div className="stat-label">Favorites</div>
             </div>
           </div>

@@ -19,6 +19,7 @@ export class ContextService {
       songCount,
       artistCount,
       albumCount,
+      favoriteCount,
     ] = await Promise.all([
       this.prisma.song.findMany({
         where: { deletedAt: null },
@@ -40,6 +41,9 @@ export class ContextService {
       this.prisma.song.count({ where: { deletedAt: null } }),
       this.prisma.artist.count({ where: { deletedAt: null } }),
       this.prisma.album.count({ where: { deletedAt: null } }),
+      this.prisma.songUserData.count({
+        where: { userId: user.userId, favorite: true, song: { deletedAt: null } },
+      }),
     ]);
 
     const favoriteArtistNames = [
@@ -59,7 +63,12 @@ export class ContextService {
       })),
       favoriteArtists: favoriteArtistNames,
       pendingProposalsCount: pendingAnalysesCount,
-      libraryStats: { songs: songCount, artists: artistCount, albums: albumCount },
+      libraryStats: {
+        songs: songCount,
+        artists: artistCount,
+        albums: albumCount,
+        favorites: favoriteCount,
+      },
     };
   }
 }
