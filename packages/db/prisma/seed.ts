@@ -4,15 +4,14 @@ import { DEFAULT_ASSISTANT_INSTRUCTIONS } from "@resonance/ai";
 
 const prisma = new PrismaClient();
 
-async function seedAdminUser() {
-  const email = process.env.SEED_ADMIN_EMAIL;
-  const password = process.env.SEED_ADMIN_PASSWORD;
+// Default login account, used when SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD aren't set. The API
+// container runs this seed on every boot (idempotent), so this account always exists.
+const DEFAULT_ADMIN_EMAIL = "praxe.tomasek@ubk.cz";
+const DEFAULT_ADMIN_PASSWORD = "12345";
 
-  if (!email || !password) {
-    throw new Error(
-      "SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set (see .env.example) before seeding.",
-    );
-  }
+async function seedAdminUser() {
+  const email = process.env.SEED_ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

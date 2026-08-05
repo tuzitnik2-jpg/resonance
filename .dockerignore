@@ -5,3 +5,6 @@
 **/.turbo
 .git
 **/*.log
+# Never bake local secrets into images — compose injects .env via env_file at runtime.
+.env
+

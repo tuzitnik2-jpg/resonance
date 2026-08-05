@@ -20,6 +20,6 @@ RUN pnpm exec turbo run build --filter=api
 ENV NODE_ENV=production
 
 EXPOSE 3001
-# Apply migrations, seed the admin user when SEED_ADMIN_EMAIL is configured (idempotent — an
-# existing user is skipped), then launch the compiled server.
-CMD ["sh", "-c", "pnpm --filter @resonance/db migrate:deploy && if [ -n \"$SEED_ADMIN_EMAIL\" ]; then pnpm --filter @resonance/db seed; fi && node apps/api/dist/main.js"]
+# Apply migrations, seed the admin login account (idempotent — an existing user is skipped;
+# credentials come from SEED_ADMIN_* or the defaults in seed.ts), then launch the server.
+CMD ["sh", "-c", "pnpm --filter @resonance/db migrate:deploy && pnpm --filter @resonance/db seed && node apps/api/dist/main.js"]
