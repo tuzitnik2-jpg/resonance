@@ -20,12 +20,20 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     env_file: .env
+    environment:
+      NODE_ENV: production
+      # Inside the compose network the bundled postgres is reachable at the "db" service name
+      # (overrides .env's localhost URL). Using an external database instead? Remove this line
+      # and set DATABASE_URL in .env.
+      DATABASE_URL: postgresql://resonance:resonance@db:5432/resonance
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "3001:3001"
-    command: pnpm --filter api start:dev
+    restart: unless-stopped
+    # No command override: the image's production CMD applies migrations, then runs the
+    # compiled server (node dist/main.js).
 
   web:
     build:
@@ -33,25 +41,32 @@ services:
       dockerfile: apps/web/Dockerfile
     env_file: .env
     environment:
-      # Overrides .env's API_INTERNAL_URL: inside the compose network, the API is reachable at
-      # the "api" service name, not localhost.
+      NODE_ENV: production
+      # Inside the compose network the API is reachable at the "api" service name, not
+      # localhost. This is what the web server uses to proxy /api/v1/* — getting it wrong
+      # yields 502s on every API call.
       API_INTERNAL_URL: http://api:3001
     depends_on:
       - api
     ports:
       - "3000:3000"
-    command: pnpm --filter web dev
+    restart: unless-stopped
+    # No command override: the image runs `next start` on the production build (never
+    # `next dev` — a dev server behind a reverse proxy fails to hydrate and renders blank).
 
   mcp:
     build:
       context: .
       dockerfile: apps/mcp/Dockerfile
     env_file: .env
+    environment:
+      NODE_ENV: production
+      RESONANCE_API_URL: http://api:3001
     depends_on:
       - api
     ports:
       - "3002:3002"
-    command: pnpm --filter mcp start:dev
+    restart: unless-stopped
 
 volumes:
   resonance_db:

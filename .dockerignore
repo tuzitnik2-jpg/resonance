@@ -1,0 +1,7 @@
+# Keep build contexts small and avoid copying host-built artifacts into images.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+.git
+**/*.log
