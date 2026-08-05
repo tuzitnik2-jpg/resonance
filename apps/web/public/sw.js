@@ -1,6 +1,8 @@
 // Minimal service worker: an app-shell/offline cache. Network-first for navigations (so you
 // always get fresh content when online), cache-first for hashed static assets.
-const CACHE = "resonance-v1";
+// Bump this on any deploy that must purge stale cached assets (the activate handler below
+// deletes every cache whose name isn't this one). v2: drop the pre-login-removal bundle.
+const CACHE = "resonance-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
