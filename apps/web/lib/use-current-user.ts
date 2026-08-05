@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMe, type Me } from "./api-client";
+import { useRouter } from "next/navigation";
+import { ApiError, getMe, type Me } from "./api-client";
 
-/**
- * Returns the current user. Login is disabled — the API resolves the single archive account for
- * every request — so this always succeeds and never redirects.
- */
+/** Redirects to /login if the session is missing/expired; otherwise returns the current user. */
 export function useCurrentUser(): { me: Me | null; loading: boolean } {
+  const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -17,14 +16,19 @@ export function useCurrentUser(): { me: Me | null; loading: boolean } {
       .then((result) => {
         if (!cancelled) setMe(result);
       })
-      .catch(() => undefined)
+      .catch((error) => {
+        if (cancelled) return;
+        if (error instanceof ApiError && error.problem.status === 401) {
+          router.replace("/login");
+        }
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   return { me, loading };
 }

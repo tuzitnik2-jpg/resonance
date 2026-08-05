@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { logout } from "@/lib/api-client";
 import { useCurrentUser } from "@/lib/use-current-user";
 
 const primary = [
@@ -84,8 +85,14 @@ function NavLinks({ pathname }: { pathname: string | null }) {
 
 export function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { me } = useCurrentUser();
   const [open, setOpen] = useState(false);
+
+  async function handleLogout() {
+    await logout().catch(() => undefined);
+    router.replace("/login");
+  }
 
   return (
     <>
@@ -127,11 +134,12 @@ export function Nav() {
         }}
       >
         <NavLinks pathname={pathname} />
-        {me && (
-          <div className="sidebar-block sidebar-footer">
-            <div className="sidebar-user">{me.email}</div>
-          </div>
-        )}
+        <div className="sidebar-block sidebar-footer">
+          {me && <div className="sidebar-user">{me.email}</div>}
+          <button onClick={handleLogout} className="btn btn-secondary btn-sm btn-block">
+            Log out
+          </button>
+        </div>
       </aside>
     </>
   );
