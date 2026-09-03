@@ -157,9 +157,32 @@ export class ImportsService {
                 primaryArtistId: artist.id,
                 albumId,
                 releaseYear: row.releaseYear,
-                releasePrecision: row.releaseYear ? "YEAR" : undefined,
+                releaseMonth: row.releaseMonth,
+                releaseDay: row.releaseDay,
+                releasePrecision: row.releasePrecision ?? (row.releaseYear ? "YEAR" : undefined),
+                durationMs: row.durationMs,
+                isrc: row.isrc,
               },
             });
+
+            for (const featuredName of row.featuredArtists ?? []) {
+              const normalizedFeatured = normalizeName(featuredName);
+              const existingFeatured = await tx.artist.findFirst({
+                where: { normalizedName: normalizedFeatured, deletedAt: null },
+              });
+              const featuredArtist =
+                existingFeatured ??
+                (await tx.artist.create({
+                  data: { canonicalName: featuredName, normalizedName: normalizedFeatured },
+                }));
+              await tx.songArtist.upsert({
+                where: {
+                  songId_artistId_role: { songId: song.id, artistId: featuredArtist.id, role: "featured" },
+                },
+                update: {},
+                create: { songId: song.id, artistId: featuredArtist.id, role: "featured" },
+              });
+            }
 
             if (row.rating || row.favorite || row.note || row.dateAdded) {
               await tx.songUserData.create({
